@@ -1,0 +1,4 @@
+//10.152.135.225/share_baybioms$   -->  /home/shiny/projects_baybioms
+//10.152.135.225/LIMS$             -->  /home/shiny/hashtab
+//10.152.135.225/share_biotyping$  -->  /home/shiny/projects_biotyping
+//10.152.135.225/share_project$    -->  /home/shiny/projects_baybioms_mri
