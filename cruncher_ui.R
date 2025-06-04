@@ -1,3 +1,7 @@
+library('shinydashboard')
+library('omicsViewer')
+source('all_functions.R')
+
 cruncher_ui <- function (id, viewOnly = FALSE)
 {
     ns <- NS(id)

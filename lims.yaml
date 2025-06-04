@@ -6,4 +6,3 @@ project_dir:
   Bioinformatics: /home/shiny/projects_bioinformatics
 annot_dir: /home/shiny/annotDb
 hashtab_dir: /home/shiny/hashtab
-# need to be mounted in shinyproxy/application.yml

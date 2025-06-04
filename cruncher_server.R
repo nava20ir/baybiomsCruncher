@@ -1,3 +1,5 @@
+source('all_functions.R')
+
 cruncher_server <- function (id, ...)
 {
     moduleServer(id, function(input, output, session) {
