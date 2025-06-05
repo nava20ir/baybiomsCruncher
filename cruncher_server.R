@@ -1,4 +1,4 @@
-source('all_functions.R')
+source('omicsViewer.R')
 
 cruncher_server <- function (id, ...)
 {
@@ -252,6 +252,8 @@ cruncher_server <- function (id, ...)
                 "config.yaml"), outputFile = file.path(normalizePath(config$dataLoading$pathESVProject),
                 "results.RDS"))
             res(v3)
+            print('getting the config')
+            print(config$dataLoading$pathESVProject)
             remove_modal_spinner()
             if (!is.null(m <- attr(v3, "message"))) {
                 showModal(modalDialog(paste(m, sep = "\n"), title = "Possible problems",
@@ -264,7 +266,10 @@ cruncher_server <- function (id, ...)
                 ".a.lock")))
                 file.remove(lockFile)
         })
-        callModule(omicsViewer:::app_module, id = "app", .dir = reactive({
+        #callModule(omicsViewer:::app_module, id = "app", .dir = reactive({
+        callModule(app_module, id = "app", .dir = reactive({
+
+            print('calling omicsViewer')
             res()
             req(config$dataLoading$pathESVProject)
             req(file.exists(file.path(normalizePath(config$dataLoading$pathESVProject),
@@ -273,7 +278,7 @@ cruncher_server <- function (id, ...)
             print(a)
             a
         }), additionalTabs = NULL, filePattern = "^results*(.*?).RDS$",
-            esetLoader = omicsViewer:::readESVObj, exprsGetter = exprs,
+            esetLoader = readESVObj, exprsGetter = exprs,
             pDataGetter = pData, fDataGetter = fData, defaultAxisGetter = function(x,
                 what = c("sx", "sy", "fx", "fy")[1]) attr(x,
                 what), appName = NULL, appVersion = NULL)

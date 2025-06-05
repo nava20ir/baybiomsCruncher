@@ -2044,6 +2044,7 @@ validMQFolder <- function (dir)
 
 writeTriplet <- function (expr, pd, fd, file, creator)
 {
+    print(expr)
     td <- function(tab) {
         ic <- which(sapply(tab, is.list))
         if (length(ic) > 0) {

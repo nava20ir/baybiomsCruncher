@@ -37,11 +37,11 @@ RUN Rscript /home/shiny/app/install_packages.R
 
 
 RUN R -e 'devtools::install_github("mengchen18/omicsViewer", dependencies = TRUE)'
-RUN R -e "devtools::install_github('mengchen18/xcmsViewer', upgrade='never')"
 RUN R -e "install.packages('shiny')"
 RUN R -e "install.packages('shinyBS')"
 RUN R -e "install.packages('shinydashboard')"
 
+#COPY  ./omicsViewer /usr/local/lib/R/site-library/omicsViewer
 
 #ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache # to force docker file to ignore cache
 
