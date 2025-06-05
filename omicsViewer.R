@@ -134,11 +134,13 @@ adist <- function (x, method = "pearson")
 }
 
 
+
+
 app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sqlite|sqlite3)$", 
                         additionalTabs = NULL, ESVObj = reactive(NULL), esetLoader = readESVObj, 
                         exprsGetter = getExprs, pDataGetter = getPData, fDataGetter = getFData, 
                         imputeGetter = getExprsImpute, defaultAxisGetter = getAx, 
-                        appName = "omicsViewer", appVersion = packageVersion("omicsViewer")) 
+                        appName = "omicsViewer", appVersion = "1.1") 
 {
   ns <- session$ns
   observe({
@@ -165,7 +167,7 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
   })
   expr <- reactive({
     req(reactive_eset())
-    exprsGetter(reactive_eset())
+    getExprs(reactive_eset())
   })
   pdata <- reactive({
     req(reactive_eset())
@@ -331,11 +333,11 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
                                                                 ns("deletess_button")))
     DT::datatable(dt[, c(1, 3), drop = FALSE], rownames = FALSE, 
                   colnames = c(NULL, NULL, NULL), selection = list(mode = "single", 
-                                                                   target = "cell", selectable = -cbind(seq_len(nrow(dt)), 
-                                                                                                        1)), escape = FALSE, options = list(dom = "t", 
-                                                                                                                                            autoWidth = FALSE, style = "compact-hover", scrollY = "450px", 
-                                                                                                                                            paging = FALSE, columns = list(list(width = "85%"), 
-                                                                                                                                                                           list(width = "15%"))))
+                    target = "cell", selectable = -cbind(seq_len(nrow(dt)), 
+                    1)), escape = FALSE, options = list(dom = "t", 
+                    autoWidth = FALSE, style = "compact-hover", scrollY = "450px", 
+                    paging = FALSE, columns = list(list(width = "85%"), 
+                                                    list(width = "15%"))))
   })
   selectedSS <- reactiveVal()
   observe({
@@ -408,10 +410,10 @@ app_ui <- function (id, showDropList = TRUE, activeTab = "Feature")
   ns <- NS(id)
   comp <- list(useShinyjs(), style = "background:white;", absolutePanel(top = 5, 
                                                                         right = 20, style = "z-index: 9999;", width = 115, downloadButton(outputId = ns("download"), 
-                                                                                                                                          label = "xlsx", class = NULL), actionButton(ns("snapshot"), 
-                                                                                                                                                                                      label = NULL, icon = icon("camera-retro"))), shinyjs::hidden(div(id = ns("contents"), 
-                                                                                                                                                                                                                                                       column(6, L1_data_space_ui(ns("dataspace"), activeTab = activeTab)), 
-                                                                                                                                                                                                                                                       column(6, L1_result_space_ui(ns("resultspace"))))))
+                                                                                label = "xlsx", class = NULL), actionButton(ns("snapshot"), 
+                                                                                label = NULL, icon = icon("camera-retro"))), shinyjs::hidden(div(id = ns("contents"), 
+                                                                                column(6, L1_data_space_ui(ns("dataspace"), activeTab = activeTab)), 
+                                                                                column(6, L1_result_space_ui(ns("resultspace"))))))
   if (showDropList) {
     l2 <- list(shinycssloaders::withSpinner(uiOutput(ns("summary")), 
                                             hide.ui = FALSE, type = 8, color = "green"), br(), 
@@ -1685,7 +1687,7 @@ getExprs <- function (x)
     rownames(mat) <- rn
   }
   else if (inherits(x, "ExpressionSet")) 
-    mat <- exprs(x)
+    mat <- Biobase::exprs(x)
   mat
 }
 
@@ -1987,7 +1989,7 @@ iheatmap <- function (x, fData = NULL, pData = NULL, impute = FALSE)
   if (inherits(x, "ExpressionSet") || inherits(x, "xcmsFeatureSet")) {
     fData <- fData(x)
     pData <- pData(x)
-    x <- exprs(x)
+    x <- Biobase::exprs(x)
   }
   ir <- unique(c(which(rowSums2(!is.na(x)) == 0), which(rowVars(x) == 
                                                           0)))
@@ -3863,11 +3865,10 @@ null2empty  <- function (x)
 }
 
 
-omicsViewer <-
-  function (dir, additionalTabs = NULL, filePattern = ".(RDS|DB|SQLITE|SQLITE3)$", 
+omicsViewer <-  function (dir, additionalTabs = NULL, filePattern = ".(RDS|DB|SQLITE|SQLITE3)$", 
             ESVObj = NULL, esetLoader = readESVObj, exprsGetter = getExprs, 
             pDataGetter = getPData, fDataGetter = getFData, defaultAxisGetter = getAx, 
-            appName = "omicsViewer", appVersion = packageVersion("omicsViewer")) 
+            appName = "omicsViewer", appVersion = "1.1") 
   {
     app <- list(ui = fluidPage(app_ui("app")), server = function(input, 
                                                                  output, session, aTabs = additionalTabs, f_eset = esetLoader, 

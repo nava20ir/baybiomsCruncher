@@ -25,6 +25,7 @@ s1 <- c(
   "shinyjs",
   "shinyFiles",
   "DT",
+  "ROCR",
   "plotly",
   "openxlsx",
   "yaml",

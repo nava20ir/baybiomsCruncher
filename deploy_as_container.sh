@@ -1,3 +1,3 @@
 
-# this will deploy the app as a docker container on the port 5930
+# this will deploy the app as a docker container on the port 5930 on linux_computing3
 sudo docker run -d -it --rm -v  /media/shiny_baybioms/Projects/002_proteomics/:/home/shiny/projects_baybioms -v  /media/shiny_baybioms/Projects/008_Bioinformatics/:/home/shiny/projects_bioinformatics -v  /media/LIMS/AnnotDB/:/home/shiny/annotDb -v  /media/share_project/Projects_Munich/009_BayBioMSMRI_Proteomics:/home/shiny/projects_baybioms_mri -v  /media/LIMS/HashTable/Proteomics/:/home/shiny/hashtab -v  /media/Biotyping/P110:/home/shiny/projects_biotyping -v  /home/asakhteman/mqcrunch/mqcrunchadmin/log:/var/log/shiny-server/  -p 5930:3839 mqctest

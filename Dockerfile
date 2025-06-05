@@ -27,7 +27,7 @@ COPY ./*.yaml /home/shiny/app/
 
 
 RUN R -e "install.packages('BiocManager')"
-RUN R -e "BiocManager::install('omicsViewer')"
+#RUN R -e "BiocManager::install('omicsViewer')"
 
 
 
@@ -36,7 +36,7 @@ RUN R -e "BiocManager::install('omicsViewer')"
 RUN Rscript /home/shiny/app/install_packages.R
 
 
-RUN R -e 'devtools::install_github("mengchen18/omicsViewer", dependencies = TRUE)'
+#RUN R -e 'devtools::install_github("mengchen18/omicsViewer", dependencies = TRUE)'
 RUN R -e "install.packages('shiny')"
 RUN R -e "install.packages('shinyBS')"
 RUN R -e "install.packages('shinydashboard')"

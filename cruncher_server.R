@@ -1,4 +1,4 @@
-source('omicsViewer.R')
+source('cruncher_functions.R')
 
 cruncher_server <- function (id, ...)
 {

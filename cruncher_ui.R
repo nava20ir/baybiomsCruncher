@@ -1,11 +1,9 @@
-library('shinydashboard')
-library('omicsViewer')
-source('all_functions.R')
+source('cruncher_functions.R')
 
 cruncher_ui <- function (id, viewOnly = FALSE)
 {
     ns <- NS(id)
-    dashboardPage(dashboardHeader(title = "MaxQuant Cruncher"),
+    dashboardPage(dashboardHeader(title = "MQ Cruncher Test"),
         dashboardSidebar(useShinyjs(), sidebarMenu(id = ns("tabs"),
             menuItem("Data Loading", tabName = ns("loading"),
                 icon = icon("file-import"), badgeLabel = "Pending",
@@ -42,5 +40,5 @@ cruncher_ui <- function (id, viewOnly = FALSE)
             tabItem(tabName = ns("viewer"), tags$style(".container-fluid { margin: 0px; padding: 0px; }"),
                 absolutePanel(top = -10, left = 275, tags$h2("Results"),
                   style = "z-index: 1111;"), fluidPage(tags$style(".container-fluid { background-color: white; }"),
-                  omicsViewer:::app_ui(ns("app")))))))
+                  app_ui(ns("app")))))))
 }

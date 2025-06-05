@@ -1,4 +1,5 @@
-source('libs.R')
+# the way chen did it is that MQCruncher is sitting on the top of omicsViewer. package I first deconvoluted omicsViewer as explained in wiki
+source('omicsViewer.R')
 
 pars <- yaml::read_yaml("/home/shiny/app/lims.yaml")
 
@@ -86,11 +87,11 @@ getQCStats <- function (x)
         iir <- which(!is.na(rowSums(x)))
         if (length(iir) > 2) {
             expra <- x[iir, ]
-            r1 <- omicsViewer::exprspca(expra, fillNA = FALSE,
+            r1 <- exprspca(expra, fillNA = FALSE,
                 prefix = "")
         }
         else r1 <- NULL
-        r2 <- omicsViewer::exprspca(expr0, fillNA = FALSE, prefix = "")
+        r2 <- exprspca(expr0, fillNA = FALSE, prefix = "")
     }
     list(nval = nval, nvalCum = nvalCum, nvalInt = nvalInt, pcNoImp = r1$samples,
         pcImp = r2$samples)
@@ -213,7 +214,7 @@ landingPage_module <- function (id, codeTable)
 landingPage_ui  <- function (id)
 {
     ns <- NS(id)
-    tagList(tags$style("#landingpageid{margin: auto;}"), h1("Welcome to BayBioMS omicsViewer for proteomics!"),
+    tagList(tags$style("#landingpageid{margin: auto;}"), h1("Welcome to BayBioMS for proteomics!"),
     absolutePanel(id = "landingpageid", class = "myClass",
     fixed = TRUE, draggable = FALSE, left = 0, right = 0,
     top = "35%", width = 500, height = "auto", wellPanel(uiOutput(ns("error.ui")),
@@ -1059,7 +1060,7 @@ module_normalization <- function (id, object, config)
             updateSelectInput(session, inputId = "pcy", choices = cn,
                 selected = cn[2])
         })
-        callModule(omicsViewer:::plotly_boxplot_module, id = "boxplotly",
+        callModule(plotly_boxplot_module, id = "boxplotly",
             reactive_param_plotly_boxplot = reactive({
                 req(expr())
                 list(x = expr(), i = input$fTab_include_rows_selected,
@@ -1086,13 +1087,13 @@ module_normalization <- function (id, object, config)
             req(r <- stats()$pcNoImp)
             prepPCScatter(r)
         })
-        v_scatter_noimpute <- callModule(omicsViewer:::plotly_scatter_module,
+        v_scatter_noimpute <- callModule(plotly_scatter_module,
             id = "pca_noimpute", reactive_param_plotly_scatter = stats_pca_noimpute)
         stats_pca_impute <- reactive({
             req(r <- stats()$pcImp)
             prepPCScatter(r)
         })
-        v_scatter_impute <- callModule(omicsViewer:::plotly_scatter_module,
+        v_scatter_impute <- callModule(plotly_scatter_module,
             id = "pca_impute", reactive_param_plotly_scatter = stats_pca_impute)
         eventReactive(input$save, {
             if (input$test == 0) {
@@ -1166,11 +1167,11 @@ module_normalization_ui <- function (id, viewOnly = FALSE)
             multiple = FALSE, selectize = TRUE)), column(3, selectInput(ns("pcy"),
             label = "PC on y axis", choices = NULL, selected = NULL,
             multiple = FALSE, selectize = TRUE)), column(width = 6,
-            tags$b("PCA no imputation"), omicsViewer:::plotly_scatter_ui(ns("pca_noimpute"),
+            tags$b("PCA no imputation"), plotly_scatter_ui(ns("pca_noimpute"),
                 height = "366px")), column(width = 6, tags$b("PCA imputation"),
-            omicsViewer:::plotly_scatter_ui(ns("pca_impute"),
+            plotly_scatter_ui(ns("pca_impute"),
                 height = "366px")), column(width = 6, tags$b("Intensity distribution"),
-            omicsViewer:::plotly_boxplot_ui(ns("boxplotly"))),
+            plotly_boxplot_ui(ns("boxplotly"))),
             column(width = 6, tags$b("Protein ID"), plotlyOutput(ns("barplot"))))))))
 }
 
