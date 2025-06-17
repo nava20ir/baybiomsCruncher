@@ -72,14 +72,28 @@ getOutliersUp  <- function (x, na.replace = quantile(x, 0.25, na.rm = TRUE), thr
 }
 
 
-getQCStats <- function (x)
+getQCStats <- function (x, method='custom')
 {
+    print('Running getQCStats with ')
+    print(method)
     nval <- colSums(!is.na(x))
     nvalCum <- colSums(rowCumsums(apply(!is.na(x), 2, as.integer)) >
         0)
     nvalInt <- colSums(!is.na(rowCumsums(x)))
+
+
     expr0 <- x
-    expr0[is.na(expr0)] <- min(expr0, na.rm = TRUE) - log10(2)
+    print(class(x))
+    print(dim(x))
+    # expr0 <- fillNA(x,method=method)
+    if ((method == 'custom') | (method == 'chen-meng')) {
+     print('Using the arbitrary method from Chen-meng')
+     expr0[is.na(expr0)] <- min(expr0, na.rm = TRUE) - log10(2)
+     } else {
+     print('using Perseus method')
+     expr0 <- impute_perseus(x)
+     }
+    
     if (ncol(x) <= 2) {
         r1 <- r2 <- NULL
     }
@@ -87,11 +101,11 @@ getQCStats <- function (x)
         iir <- which(!is.na(rowSums(x)))
         if (length(iir) > 2) {
             expra <- x[iir, ]
-            r1 <- exprspca(expra, fillNA = FALSE,
+            r1 <- exprspca(expra, fillNA = FALSE, method = method,
                 prefix = "")
         }
         else r1 <- NULL
-        r2 <- exprspca(expr0, fillNA = FALSE, prefix = "")
+        r2 <- exprspca(expr0, fillNA = FALSE, method = method, prefix = "")
     }
     list(nval = nval, nvalCum = nvalCum, nvalInt = nvalInt, pcNoImp = r1$samples,
         pcImp = r2$samples)
@@ -856,15 +870,31 @@ module_normalization <- function (id, object, config)
             if (file.exists(f))
                 obj(readRDS(f))
         })
+
         observe({
             req(obj())
+            
+            selected = conf()$inputData
+            print(paste0('intensity method changed: ',selected))
             cc <- c(`Corrected reporter intensity` = "Reporter.intensity.corrected.log10",
                 `LFQ intensity` = "LFQ.intensity", `iBAQ intensity` = "iBAQ",
                 `Expression matrix` = "exprs")
             cc <- cc[cc %in% names(obj())]
             updateAwesomeRadio(session = session, inputId = "inputData",
-                choices = cc, selected = conf()$inputData)
+                choices = cc, selected = selected)
         })
+
+        observe({
+            req(obj())
+            selected = conf()$imputationMethod
+            print(paste0('imputation method changed: ',selected))
+            cc <- c('chen-meng','perseus')
+            updateAwesomeRadio(session = session,
+                inputId = "imputationMethod",
+                choices = cc,
+                selected = selected)
+        })
+
         pdata <- reactive({
             req(obj())
             r <- obj()$pdata
@@ -1005,8 +1035,12 @@ module_normalization <- function (id, object, config)
         })
         stats <- reactive({
             req(expr())
+            req(input$imputationMethod)
+            imputationMethod = input$imputationMethod
+
             show_modal_spinner(text = "Calculating ...")
-            r <- getQCStats(expr())
+            print('calculating PCA')
+            r <- getQCStats(expr(),method = imputationMethod)
             remove_modal_spinner()
             r
         })
@@ -1070,6 +1104,8 @@ module_normalization <- function (id, object, config)
             c(match(input$pcx, colnames(stats()$pcImp)), match(input$pcy,
                 colnames(stats()$pcImp)))
         })
+
+        
         prepPCScatter <- function(r) {
             req(input$pcx)
             req(input$pcy)
@@ -1104,6 +1140,10 @@ module_normalization <- function (id, object, config)
             }
             conf <- list()
             conf$inputData <- input$inputData
+            conf$imputationMethod <- input$imputationMethod
+            print("this is imputation method for plotly")
+            print(conf$imputationMethod)
+
             conf$normCol <- input$normCol
             conf$normRow <- input$normRow
             if (input$rowMax)
@@ -1112,8 +1152,12 @@ module_normalization <- function (id, object, config)
                 conf$filterVar <- param$pdata.var
                 conf$filterVarMinN <- param$pdata.var.n
             }
-            rl <- list(pdata = pdata(), fdata = featureData(),
+
+            rl <- list(
+                pdata = pdata(),
+                fdata = featureData(),
                 expr = expr())
+
             saveRDS(rl, file = file.path(config$dataLoading$pathESVProject,
                 "objNorm.RDS"))
             rl$mqpar <- obj()$mqpar
@@ -1135,9 +1179,14 @@ module_normalization_ui <- function (id, viewOnly = FALSE)
         "Save configuration"), style = "z-index: 1111;")
     tagList(absolutePanel(top = -10, left = 275, tags$h2("Normalization"),
         style = "z-index: 1111;"), tl, sidebarLayout(sidebarPanel(style = "height: 973px; background-color:white",
-        tabsetPanel(tabPanel("Setting", awesomeRadio(inputId = ns("inputData"),
+        tabsetPanel(tabPanel("Setting",
+            awesomeRadio(inputId = ns("inputData"),
             label = "Select input data:", choices = "", selected = "",
-            inline = FALSE), checkboxInput(ns("rowMax"), label = "Filtering proteins according to row max intensity"),
+            inline = FALSE),
+            awesomeRadio(inputId = ns("imputationMethod"),
+            label = "Select imputation method:", choices = (c('custom','perseus')), selected = "custom",
+            inline = FALSE),
+            checkboxInput(ns("rowMax"), label = "Filtering proteins according to row max intensity"),
             conditionalPanel("input.rowMax == true", ns = ns,
                 textInputIcon(ns("rowMaxPercent"), label = NULL,
                   icon = list("Quantile:"), placeholder = "e.g. '0.1' means row max intensity lower than 10% intensity quantile will be removed")),
@@ -1559,6 +1608,8 @@ module_ttest_ui <- function (id, viewOnly = FALSE)
 
 mqCrunch <- function (config, file = NULL, outputFile = NULL)
 {
+
+
     if (missing(config) && !is.null(file))
         config <- yaml::read_yaml(file)
     message <- c()
@@ -1574,7 +1625,10 @@ mqCrunch <- function (config, file = NULL, outputFile = NULL)
         expr <- obj[[config$normalization$inputData]][, i, drop = FALSE]
         i <- rowSums(!is.na(expr)) > 0
         expr <- expr[i, ]
-        expr <- normalizeData(expr, colWise = config$normalization$normCol,
+
+
+        expr <- normalizeData(expr,
+            colWise = config$normalization$normCol,
             rowWise = config$normalization$normRow, ref = pdata$Reference,
             batch = pdata$Batch)
         fdata <- obj$annot[i, config$dataLoading$fdataHeader]
@@ -1633,9 +1687,18 @@ mqCrunch <- function (config, file = NULL, outputFile = NULL)
         colnames(tl) <- NULL
         tss <- unique(rbind(tss, tl))
     }
+    
+    if (!is.null(config$imputationMethod)) {
+    imputationMethod <- config$imputationMethod
+    print(paste0('### this is the imputationMethod before Preomics ### :',imputationMethod))
+    } else {
+    imputationMethod = 'custom' # this is the method defined by chen-meng
+    print(' #### sth is wrong with the imputation method so we use the default method ###')
+    }
+    
     dd <- prepOmicsViewer(expr = obj$expr, pData = obj$pdata,
         fData = obj$fdata, PCA = TRUE, pca.fillNA = TRUE, t.test = tss,
-        ttest.fillNA = TRUE, stringDB = sdbid, gs = gs, SummarizedExperiment = FALSE)
+        ttest.fillNA = TRUE, method = imputationMethod, stringDB = sdbid, gs = gs, SummarizedExperiment = FALSE)
     gs <- attr(fData(dd), "GS")
     if (length(steps) > 0) {
         fd <- fData(dd)
@@ -2045,7 +2108,7 @@ validMQFolder <- function (dir)
 
 writeTriplet <- function (expr, pd, fd, file, creator)
 {
-    print(expr)
+    #print(expr)
     td <- function(tab) {
         ic <- which(sapply(tab, is.list))
         if (length(ic) > 0) {

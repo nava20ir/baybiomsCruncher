@@ -1173,7 +1173,7 @@ exprsImpute <- function (x)
 }
 
 
-exprspca <- function (x, n = min(8, ncol(x) - 1), prefix = "PCA|All", fillNA = FALSE, 
+exprspca <- function (x, n = min(8, ncol(x) - 1), prefix = "PCA|All", fillNA = FALSE, method = 'custom',
                       ...) 
 {
   writePC <- function(x, n) {
@@ -1189,7 +1189,8 @@ exprspca <- function (x, n = min(8, ncol(x) - 1), prefix = "PCA|All", fillNA = F
     list(samples = xx, features = pp)
   }
   if (fillNA) {
-    x <- fillNA(x)
+    print(paste0(' #### using the imputation method from exprspca line 1176 omicsViewer #### ',method))
+    x <- fillNA(x, method = method)
     pc <- prcomp(t(x))
   }
   else {
@@ -1493,9 +1494,29 @@ fgsea1 <- function (gs, stats, gs_desc = NULL, ...)
 }
 
 
-fillNA <- function (x, maxfill = quantile(x, probs = 0.15, na.rm = TRUE), 
+
+fillNA <- function(x, method='custom'){
+  result = x
+  result <- tryCatch({
+    if ((method == 'custom') | (method == 'chen-meng')) {
+    result = impute_custom(x)
+  } else {
+    result = impute_perseus(x)
+  }
+}, error = function(e) {
+  message("Error caught: ", e$message)
+  result  # Return fallback value
+})
+  print(any(is.na(result)))
+  print(mean(result))
+  return(result)
+} 
+
+
+impute_custom <- function (x, maxfill = quantile(x, probs = 0.15, na.rm = TRUE), 
                     fillingFun = function(x) min(x, na.rm = TRUE) - log10(2)) 
 {
+  print('Running imputation function for Chen method')
   xf <- apply(x, 1, function(xx) {
     x3 <- xx
     x3[is.na(x3)] <- min(maxfill, fillingFun(xx))
@@ -1506,6 +1527,29 @@ fillNA <- function (x, maxfill = quantile(x, probs = 0.15, na.rm = TRUE),
   colnames(xf) <- colnames(xf)
   xf
 }
+
+
+impute_perseus <- function(object, width=0.3, downshift=1.8, seed=100) {
+  print('Running imputation function for perseus method')
+  mx <- max(object, na.rm=TRUE)
+  mn <- min(object, na.rm=TRUE)
+  set.seed(seed)
+  xf <- apply(object, 2, function(temp) {
+    temp[!is.finite(temp)] <- NA
+    temp_sd <- stats::sd(temp, na.rm=TRUE)
+    temp_mean <- mean(temp, na.rm=TRUE)
+    shrinked_sd <- width * temp_sd   # shrink sd width
+    downshifted_mean <- temp_mean - downshift * temp_sd   # shift mean of imputed values
+    n_missing <- sum(is.na(temp))
+    temp[is.na(temp)] <- stats::rnorm(n_missing, mean=downshifted_mean, sd=shrinked_sd)
+    temp
+  })
+
+  xf
+}
+
+
+
 
 
 filterRow <- function (x, max.quantile = NULL, max.value = NULL, var = NULL, 
@@ -2069,13 +2113,13 @@ iheatmapLegend <- function (id)
 
 
 iheatmapModule <- function (input, output, session, mat, pd, fd, status = reactive(NULL), 
-                            fill.NA = TRUE) 
+                            fill.NA = TRUE , method = 'custom') 
 {
   ns <- session$ns
   matr <- reactive({
     req(mat())
     if (any(is.na(mat())) && fill.NA) 
-      r <- fillNA(mat())
+      r <- fillNA(mat(),method = method)
     else r <- mat()
     r
   })
@@ -2717,6 +2761,7 @@ L1_data_space_module <- function (input, output, session, expr, pdata, fdata, re
     }
     else stop("Incorrect dimension of cormat!")
   })
+  
   s_cor_heatmap <- callModule(iheatmapModule, "corheatmapViewer", 
                               mat = cmat, pd = pdata, fd = pdata, status = reactive(status()$eset_cor_heatmap), 
                               fill.NA = FALSE)
@@ -3322,13 +3367,14 @@ motifRF <- function (fg.seqs, bg.seqs, fg.pfm = NULL, bg.pfm = NULL)
 }
 
 
-multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, ...) 
+multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'custom', ...) 
 {
+  print(paste0(' #### using the imputation method from multi.t.test #### ',method))
   x0 <- x
   if (is.vector(compare) || length(compare) == 3) 
     compare <- matrix(compare, nrow = 1)
   if (fillNA) 
-    x <- fillNA(x)
+    x <- fillNA(x, method = method)
   if (is.null(compare)) 
     return(NULL)
   tl <- lapply(unique(compare[, 1]), function(x) {
@@ -4297,9 +4343,15 @@ plotly_scatter <- function (x, y, xlab = "", ylab = "ylab", color = "", shape = 
 }
 
 
-plotly_scatter_module <- function (input, output, session, reactive_param_plotly_scatter, 
-                                   reactive_regLine = reactive(FALSE), reactive_checkpoint = reactive(TRUE), 
-                                   htest_var1 = reactive(NULL), htest_var2 = reactive(NULL)) 
+plotly_scatter_module <- function (input,
+                                   output, 
+                                   session, 
+                                   reactive_param_plotly_scatter, 
+                                   reactive_regLine = reactive(FALSE),
+                                   reactive_checkpoint = reactive(TRUE), 
+                                   htest_var1 = reactive(NULL),
+                                  htest_var2 = reactive(NULL)
+                                  ) 
 {
   options(warn = -1)
   ns <- session$ns
@@ -4421,9 +4473,10 @@ plotly_scatter_ui <- function (id, height = "400px")
 
 
 prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol(expr)), 
-                             pca.fillNA = TRUE, t.test = NULL, ttest.fillNA = FALSE, ..., 
+                             pca.fillNA = TRUE, method = 'custom', t.test = NULL, ttest.fillNA = FALSE, ..., 
                              gs = NULL, stringDB = NULL, surv = NULL, SummarizedExperiment = TRUE) 
 {
+  
   p0 <- pData
   de <- dim(expr)
   if (nrow(pData) != de[2]) 
@@ -4462,13 +4515,13 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
   colnames(pData) <- paste0("General|All|", trimws(colnames(pData)))
   colnames(fData) <- paste0("General|All|", trimws(colnames(fData)))
   if (PCA) {
-    pc <- exprspca(expr, n = ncomp, fillNA = pca.fillNA)
+    pc <- exprspca(expr, n = ncomp, fillNA = pca.fillNA, method = method)
     pData <- cbind(pData, pc$samples)
     fData <- cbind(fData, pc$features)
   }
   if (!is.null(t.test)) {
     tres <- multi.t.test(x = expr, pheno = p0, compare = t.test, 
-                         fillNA = ttest.fillNA, ...)
+                         fillNA = ttest.fillNA, method = method, ...)
     fData <- cbind(fData, tres)
   }
   rk <- data.frame(apply(expr, 2, rank), stringsAsFactors = FALSE)
@@ -4535,8 +4588,10 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
   fy2 <- grep("PCA\\|All\\|PC2\\(", colnames(fData), value = TRUE)
   px <- grep("PCA\\|All\\|PC1\\(", colnames(pData), value = TRUE)
   py <- grep("PCA\\|All\\|PC2\\(", colnames(pData), value = TRUE)
+
   exprsWithAttr <- function(x, fillNA = FALSE, environment = FALSE, 
                             attrs = c("rowDendrogram", "colDendrogram")) {
+    print(paste0(' #### using the imputation method from exprsWithAttr #### ',method))
     if (environment) 
       aenv <- new.env()
     else aenv <- list()
@@ -4544,12 +4599,13 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
     for (i in attrs) attr(mx, i) <- attr(x, i)
     aenv$exprs <- mx
     if (fillNA) {
-      mxf <- fillNA(mx)
+      mxf <- fillNA(mx, method = method)
       for (i in attrs) attr(mxf, i) <- attr(x, i)
       aenv$exprs_impute <- mxf
     }
     aenv
   }
+
   if (!SummarizedExperiment) {
     aenv <- exprsWithAttr(expr, fillNA = pca.fillNA || ttest.fillNA, 
                           environment = TRUE)
@@ -4557,6 +4613,7 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
                          featureData = AnnotatedDataFrame(fData))
   }
   else {
+
     DataFrameWithAttr <- function(x) {
       attrs <- setdiff(names(attributes(x)), c("names", 
                                                "class", "row.names"))
@@ -4567,6 +4624,8 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
       for (i in names(attr_list)) attr(x, i) <- attr_list[[i]]
       x
     }
+
+
     aenv <- exprsWithAttr(expr, fillNA = pca.fillNA || ttest.fillNA, 
                           environment = FALSE)
     pd <- DataFrameWithAttr(pData)
