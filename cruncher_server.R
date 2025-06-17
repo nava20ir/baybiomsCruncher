@@ -253,7 +253,7 @@ cruncher_server <- function (id, ...)
                 "results.RDS"))
             res(v3)
             print('getting the config')
-            print(config$dataLoading$pathESVProject)
+            print(paste0('this is the imputation method implemented: ',config$normalization$imputationMethod))
             remove_modal_spinner()
             if (!is.null(m <- attr(v3, "message"))) {
                 showModal(modalDialog(paste(m, sep = "\n"), title = "Possible problems",
@@ -278,7 +278,7 @@ cruncher_server <- function (id, ...)
             print(a)
             a
         }), additionalTabs = NULL, filePattern = "^results*(.*?).RDS$",
-            esetLoader = readESVObj, exprsGetter = exprs,
+            esetLoader = readESVObj, exprsGetter = exprs,imputationMethod = config$normalization$imputationMethod,
             pDataGetter = pData, fDataGetter = fData, defaultAxisGetter = function(x,
                 what = c("sx", "sy", "fx", "fy")[1]) attr(x,
                 what), appName = NULL, appVersion = NULL)

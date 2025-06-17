@@ -74,18 +74,16 @@ getOutliersUp  <- function (x, na.replace = quantile(x, 0.25, na.rm = TRUE), thr
 
 getQCStats <- function (x, method='custom')
 {
-    print('Running getQCStats with ')
+    print('Running getQCStats with ') # this works fine
     print(method)
     nval <- colSums(!is.na(x))
     nvalCum <- colSums(rowCumsums(apply(!is.na(x), 2, as.integer)) >
         0)
     nvalInt <- colSums(!is.na(rowCumsums(x)))
-
-
     expr0 <- x
-    print(class(x))
-    print(dim(x))
-    # expr0 <- fillNA(x,method=method)
+    #print(class(x))
+    #print(dim(x))
+    # expr0 <- fillNA(x,method=method)  # chen is using different strategies in PCA plot and in t-test
     if ((method == 'custom') | (method == 'chen-meng')) {
      print('Using the arbitrary method from Chen-meng')
      expr0[is.na(expr0)] <- min(expr0, na.rm = TRUE) - log10(2)
@@ -94,6 +92,8 @@ getQCStats <- function (x, method='custom')
      expr0 <- impute_perseus(x)
      }
     
+    #print(dim(expr0))
+    #print(any(is.na(expr0)))
     if (ncol(x) <= 2) {
         r1 <- r2 <- NULL
     }
@@ -1184,7 +1184,7 @@ module_normalization_ui <- function (id, viewOnly = FALSE)
             label = "Select input data:", choices = "", selected = "",
             inline = FALSE),
             awesomeRadio(inputId = ns("imputationMethod"),
-            label = "Select imputation method:", choices = (c('custom','perseus')), selected = "custom",
+            label = "Select imputation method:", choices = (c('custom','perseus')), selected = "perseus",
             inline = FALSE),
             checkboxInput(ns("rowMax"), label = "Filtering proteins according to row max intensity"),
             conditionalPanel("input.rowMax == true", ns = ns,
@@ -1687,13 +1687,14 @@ mqCrunch <- function (config, file = NULL, outputFile = NULL)
         colnames(tl) <- NULL
         tss <- unique(rbind(tss, tl))
     }
-    
-    if (!is.null(config$imputationMethod)) {
-    imputationMethod <- config$imputationMethod
+    print('calling the imputation method line 1690')
+    #print(config)
+    if (!is.null(config$normalization$imputationMethod)) {
+    imputationMethod <- config$normalization$imputationMethod
     print(paste0('### this is the imputationMethod before Preomics ### :',imputationMethod))
     } else {
-    imputationMethod = 'custom' # this is the method defined by chen-meng
-    print(' #### sth is wrong with the imputation method so we use the default method ###')
+    imputationMethod = 'perseus' # 
+    print(' #### sth is wrong with the imputation method so we use perseus method as default ###')
     }
     
     dd <- prepOmicsViewer(expr = obj$expr, pData = obj$pdata,
@@ -1730,7 +1731,7 @@ mqCrunch <- function (config, file = NULL, outputFile = NULL)
         ic <- intersect(ic, colnames(obj$pdata))
         d0 <- obj$pdata[, ic, drop = FALSE]
         c1 <- correlationAnalysis(obj$expr, d0, min.value = 5)
-        c2 <- correlationAnalysis(fillNA(obj$expr), d0, min.value = 5)
+        c2 <- correlationAnalysis(fillNA(obj$expr, method = config$normaliation$imputationMethod), d0, min.value = 5)
         if (ncol(c2) > 0)
             colnames(c2) <- paste0(colnames(c2), ".impute")
         fd <- fData(dd)

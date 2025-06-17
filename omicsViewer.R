@@ -140,8 +140,9 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
                         additionalTabs = NULL, ESVObj = reactive(NULL), esetLoader = readESVObj, 
                         exprsGetter = getExprs, pDataGetter = getPData, fDataGetter = getFData, 
                         imputeGetter = getExprsImpute, defaultAxisGetter = getAx, 
-                        appName = "omicsViewer", appVersion = "1.1") 
+                        appName = "omicsViewer", appVersion = "1.1", imputationMethod = 'custom') 
 {
+  print('start of app module')
   ns <- session$ns
   observe({
     req(.dir())
@@ -184,6 +185,7 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       return(list(FALSE, "The rownames/colnames of exprs not matched to row names of feature data/phenotype data!"))
     TRUE
   }
+  print('middle of app module')
   vEset <- reactiveVal(FALSE)
   observe({
     req(expr())
@@ -235,7 +237,9 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
         id <- paste0("ID", seq_len(nrow(tab)))
       data.frame(ID = id, tab)
     }
+    
     ig <- imputeGetter(reactive_eset())
+    
     withProgress(message = "Writing table", value = 0, {
       wb <- createWorkbook(creator = "BayBioMS")
       addWorksheet(wb, sheetName = "Phenotype info")
@@ -274,7 +278,7 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
   v1 <- callModule(L1_data_space_module, id = "dataspace", 
                    expr = expr, pdata = pdata, fdata = fdata, reactive_x_s = d_s_x, 
                    reactive_y_s = d_s_y, reactive_x_f = d_f_x, reactive_y_f = d_f_y, 
-                   status = esv_status, cormat = cormat)
+                   status = esv_status, cormat = cormat , imputationMethod = imputationMethod)
   sameValues <- function(a, b) {
     if (is.null(a) || is.null(b)) 
       return(FALSE)
@@ -641,21 +645,22 @@ attr4selector_ui <- function (id, circle = TRUE, right = FALSE)
            br(), triselector_ui(ns("selectColorUI")), triselector_ui(ns("selectShapeUI")), 
            triselector_ui(ns("selectSizeUI")), triselector_ui(ns("selectTooltipUI")), 
            triselector_ui(ns("selectSearchCol")), conditionalPanel("1 == 2", 
-                                                                   checkboxInput(ns("showSearchBox"), label = "show", 
-                                                                                 value = FALSE)), conditionalPanel("input.showSearchBox == true", 
-                                                                                                                   ns = ns, div(style = "padding-left:100px; padding-right:0px; padding-top:0px; padding-bottom:0px", 
-                                                                                                                                selectInput(ns("searchon"), label = NULL, choices = NULL, 
-                                                                                                                                            multiple = TRUE, width = "100%"))), fluidRow(column(2), 
-                                                                                                                                                                                         column(4, offset = 0, style = "padding:2px;", textInputIcon(inputId = ns("xcut"), 
-                                                                                                                                                                                                                                                     label = "Select points by x/y cutoffs", value = "log10(2)", 
-                                                                                                                                                                                                                                                     placeholder = "e.g. -1 or -log10(2)", icon = list("x-cut"))), 
-                                                                                                                                                                                         column(4, offset = 0, style = "padding-left:5px; padding-right:2px; padding-top:27px; padding-bottom:2px;", 
-                                                                                                                                                                                                textInputIcon(inputId = ns("ycut"), label = NULL, 
-                                                                                                                                                                                                              value = "-log10(0.05)", placeholder = "e.g 2 or -log10(0.05)", 
-                                                                                                                                                                                                              icon = list("y-cut"))), column(2, offset = 0, 
-                                                                                                                                                                                                                                             style = "padding-left:5px; padding-right:20px; padding-top:4px; padding-bottom:2px;", 
-                                                                                                                                                                                                                                             selectInput(inputId = ns("scorner"), label = "Area", 
-                                                                                                                                                                                                                                                         choices = "None", selectize = TRUE))))
+          checkboxInput(ns("showSearchBox"), label = "show", 
+          value = FALSE)), conditionalPanel("input.showSearchBox == true", 
+          ns = ns, div(style = "padding-left:100px; padding-right:0px; padding-top:0px; padding-bottom:0px", 
+          selectInput(ns("searchon"), label = NULL, choices = NULL, 
+          multiple = TRUE, width = "100%"))), fluidRow(column(2), 
+          column(4, offset = 0, style = "padding:2px;", textInputIcon(inputId = ns("xcut"), 
+          label = "Select points by x/y cutoffs", value = "log10(2)", 
+          placeholder = "e.g. -1 or -log10(2)", icon = list("x-cut"))), 
+          column(4, offset = 0, style = "padding-left:5px; padding-right:2px; padding-top:27px; padding-bottom:2px;", 
+          textInputIcon(inputId = ns("ycut"), label = NULL, 
+          value = "-log10(0.05)", placeholder = "e.g 2 or -log10(0.05)", 
+          icon = list("y-cut"))), column(2, offset = 0, 
+          style = "padding-left:5px; padding-right:20px; padding-top:4px; padding-bottom:2px;", 
+          selectInput(inputId = ns("scorner"), label = "Area", 
+              choices = "None", selectize = TRUE))))
+
 }
 
 
@@ -1166,6 +1171,7 @@ enrichment_fgsea_ui <- function (id)
 
 exprsImpute <- function (x) 
 {
+  print('Running exprsImpute')
   v <- try(x@assayData$exprs_impute, silent = TRUE)
   if (inherits(v, "try-error")) 
     v <- NULL
@@ -1176,6 +1182,7 @@ exprsImpute <- function (x)
 exprspca <- function (x, n = min(8, ncol(x) - 1), prefix = "PCA|All", fillNA = FALSE, method = 'custom',
                       ...) 
 {
+  print('calling exprspca function from omicsViewer')
   writePC <- function(x, n) {
     n <- min(n, length(x$sdev))
     var <- round(x$sdev[seq_len(n)]^2/(sum(x$sdev^2)) * 100, 
@@ -1495,10 +1502,10 @@ fgsea1 <- function (gs, stats, gs_desc = NULL, ...)
 
 
 
-fillNA <- function(x, method='custom'){
+fillNA <- function(x, method='perseus'){
   result = x
   result <- tryCatch({
-    if ((method == 'custom') | (method == 'chen-meng')) {
+  if ((method == 'custom') | (method == 'chen-meng')) {
     result = impute_custom(x)
   } else {
     result = impute_perseus(x)
@@ -1516,7 +1523,7 @@ fillNA <- function(x, method='custom'){
 impute_custom <- function (x, maxfill = quantile(x, probs = 0.15, na.rm = TRUE), 
                     fillingFun = function(x) min(x, na.rm = TRUE) - log10(2)) 
 {
-  print('Running imputation function for Chen method')
+  print('impute_custom: Running imputation function for Chen method')
   xf <- apply(x, 1, function(xx) {
     x3 <- xx
     x3[is.na(x3)] <- min(maxfill, fillingFun(xx))
@@ -1530,7 +1537,7 @@ impute_custom <- function (x, maxfill = quantile(x, probs = 0.15, na.rm = TRUE),
 
 
 impute_perseus <- function(object, width=0.3, downshift=1.8, seed=100) {
-  print('Running imputation function for perseus method')
+  print('impute_perseus: Running imputation function for perseus method')
   mx <- max(object, na.rm=TRUE)
   mn <- min(object, na.rm=TRUE)
   set.seed(seed)
@@ -1738,6 +1745,7 @@ getExprs <- function (x)
 
 getExprsImpute <- function (x) 
 {
+  print('Running getExprsImpute')
   if (inherits(x, "SQLiteConnection")) {
     if (!"exprsimpute" %in% dbListTables(x)) 
       return(NULL)
@@ -2028,35 +2036,41 @@ heatmapKey <- function (range, colors)
 }
 
 
-iheatmap <- function (x, fData = NULL, pData = NULL, impute = FALSE) 
-{
-  if (inherits(x, "ExpressionSet") || inherits(x, "xcmsFeatureSet")) {
-    fData <- fData(x)
-    pData <- pData(x)
-    x <- Biobase::exprs(x)
-  }
-  ir <- unique(c(which(rowSums2(!is.na(x)) == 0), which(rowVars(x) == 
-                                                          0)))
-  if (length(ir) > 0) {
-    fData <- fData[-ir, ]
-    x <- x[-ir, ]
-  }
-  if (impute) {
-    x <- apply(x, 1, function(xx) {
-      xx[is.na(xx)] <- min(xx, na.rm = TRUE) * 0.9
-      xx
-    })
-    x <- t(x)
-  }
-  ui <- fluidPage(sidebarLayout(sidebarPanel = sidebarPanel(tabsetPanel(tabPanel("Parameters", 
-                                                                                 iheatmapInput(id = "test")), tabPanel("Legend", iheatmapLegend(id = "test")))), 
-                                mainPanel = mainPanel(iheatmapOutput(id = "test"))))
-  server <- function(input, output) {
-    callModule(iheatmapModule, "test", mat = reactive(x), 
-               pd = reactive(pData), fd = reactive(fData))
-  }
-  shinyApp(ui, server)
-}
+# iheatmap <- function (x, fData = NULL, pData = NULL, impute = FALSE) 
+# {
+#   if (inherits(x, "ExpressionSet") || inherits(x, "xcmsFeatureSet")) {
+#     fData <- fData(x)
+#     pData <- pData(x)
+#     x <- Biobase::exprs(x)
+#   }
+#   ir <- unique(c(which(rowSums2(!is.na(x)) == 0), which(rowVars(x) == 
+#                                                           0)))
+#   if (length(ir) > 0) {
+#     fData <- fData[-ir, ]
+#     x <- x[-ir, ]
+#   }
+#   if (impute) {
+#     x <- apply(x, 1, function(xx) {
+#       xx[is.na(xx)] <- min(xx, na.rm = TRUE) * 0.9
+#       xx
+#     })
+#     x <- t(x)
+#   }
+#   ui <- fluidPage(sidebarLayout(sidebarPanel = sidebarPanel(tabsetPanel(tabPanel("Parameters", 
+#                               iheatmapInput(id = "test")), tabPanel("Legend", iheatmapLegend(id = "test")))), 
+#                                 mainPanel = mainPanel(iheatmapOutput(id = "test"))))
+
+#   server <- function(input, output) {
+
+#     callModule(iheatmapModule,
+#                "test",
+#                mat = reactive(x), 
+#                pd = reactive(pData),
+#                fd = reactive(fData))
+
+#   }
+#   shinyApp(ui, server)
+# }
 
 
 iheatmapClear <- function (id) 
@@ -2113,8 +2127,9 @@ iheatmapLegend <- function (id)
 
 
 iheatmapModule <- function (input, output, session, mat, pd, fd, status = reactive(NULL), 
-                            fill.NA = TRUE , method = 'custom') 
+                            fill.NA = TRUE , method = 'perseus') 
 {
+  print('Running iheatmapModule')
   ns <- session$ns
   matr <- reactive({
     req(mat())
@@ -2736,7 +2751,7 @@ iheatmapOutput <- function (id)
 
 L1_data_space_module <- function (input, output, session, expr, pdata, fdata, reactive_x_s = reactive(NULL), 
                                   reactive_y_s = reactive(NULL), reactive_x_f = reactive(NULL), 
-                                  reactive_y_f = reactive(NULL), cormat = reactive(NULL), status = reactive(NULL)) 
+                                  reactive_y_f = reactive(NULL), cormat = reactive(NULL), status = reactive(NULL), imputationMethod = 'custom') 
 {
   ns <- session$ns
   cmat <- reactive({
@@ -2763,10 +2778,23 @@ L1_data_space_module <- function (input, output, session, expr, pdata, fdata, re
   })
   
   s_cor_heatmap <- callModule(iheatmapModule, "corheatmapViewer", 
-                              mat = cmat, pd = pdata, fd = pdata, status = reactive(status()$eset_cor_heatmap), 
-                              fill.NA = FALSE)
-  s_heatmap <- callModule(iheatmapModule, "heatmapViewer", 
-                          mat = expr, pd = pdata, fd = fdata, status = reactive(status()$eset_heatmap))
+                              mat = cmat,
+                              pd = pdata,
+                              fd = pdata,
+                              status = reactive(status()$eset_cor_heatmap), 
+                              fill.NA = FALSE
+                              )
+
+  s_heatmap <- callModule(iheatmapModule,
+                           "heatmapViewer", 
+                            mat = expr,
+                            pd = pdata,
+                            fd = fdata,
+                            status = reactive(status()$eset_heatmap),
+                            fill.NA = TRUE,
+                            method = imputationMethod
+                            )
+
   s_feature_fig <- callModule(meta_scatter_module, id = "feature_space", 
                               reactive_meta = fdata, reactive_expr = expr, combine = "feature", 
                               source = "scatter_meta_feature", reactive_x = reactive_x_f, 
@@ -3367,7 +3395,7 @@ motifRF <- function (fg.seqs, bg.seqs, fg.pfm = NULL, bg.pfm = NULL)
 }
 
 
-multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'custom', ...) 
+multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'perseus', ...) 
 {
   print(paste0(' #### using the imputation method from multi.t.test #### ',method))
   x0 <- x
@@ -3911,23 +3939,23 @@ null2empty  <- function (x)
 }
 
 
-omicsViewer <-  function (dir, additionalTabs = NULL, filePattern = ".(RDS|DB|SQLITE|SQLITE3)$", 
-            ESVObj = NULL, esetLoader = readESVObj, exprsGetter = getExprs, 
-            pDataGetter = getPData, fDataGetter = getFData, defaultAxisGetter = getAx, 
-            appName = "omicsViewer", appVersion = "1.1") 
-  {
-    app <- list(ui = fluidPage(app_ui("app")), server = function(input, 
-                                                                 output, session, aTabs = additionalTabs, f_eset = esetLoader, 
-                                                                 f_exprs = exprsGetter, f_pd = pDataGetter, f_fd = fDataGetter, 
-                                                                 axg = defaultAxisGetter) {
-      callModule(app_module, id = "app", .dir = reactive(dir), 
-                 additionalTabs = aTabs, filePattern = filePattern, 
-                 esetLoader = f_eset, exprsGetter = f_exprs, pDataGetter = f_pd, 
-                 fDataGetter = f_fd, defaultAxisGetter = axg, appName = appName, 
-                 appVersion = appVersion, ESVObj = reactive(ESVObj))
-    })
-    runApp(app)
-  }
+# omicsViewer <-  function (dir, additionalTabs = NULL, filePattern = ".(RDS|DB|SQLITE|SQLITE3)$", 
+#             ESVObj = NULL, esetLoader = readESVObj, exprsGetter = getExprs, 
+#             pDataGetter = getPData, fDataGetter = getFData, defaultAxisGetter = getAx, 
+#             appName = "omicsViewer", appVersion = "1.1") 
+#   {
+#     app <- list(ui = fluidPage(app_ui("app")), server = function(input, 
+#                                                                  output, session, aTabs = additionalTabs, f_eset = esetLoader, 
+#                                                                  f_exprs = exprsGetter, f_pd = pDataGetter, f_fd = fDataGetter, 
+#                                                                  axg = defaultAxisGetter) {
+#       callModule(app_module, id = "app", .dir = reactive(dir), 
+#                  additionalTabs = aTabs, filePattern = filePattern, 
+#                  esetLoader = f_eset, exprsGetter = f_exprs, pDataGetter = f_pd, 
+#                  fDataGetter = f_fd, defaultAxisGetter = axg, appName = appName, 
+#                  appVersion = appVersion, ESVObj = reactive(ESVObj))
+#     })
+#     runApp(app)
+#   }
 
 
 parseDatTerm <- function (file, outputDir = NULL, ...) 
@@ -4476,7 +4504,7 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
                              pca.fillNA = TRUE, method = 'custom', t.test = NULL, ttest.fillNA = FALSE, ..., 
                              gs = NULL, stringDB = NULL, surv = NULL, SummarizedExperiment = TRUE) 
 {
-  
+  print('Running Preomics')
   p0 <- pData
   de <- dim(expr)
   if (nrow(pData) != de[2]) 
@@ -4520,6 +4548,7 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
     fData <- cbind(fData, pc$features)
   }
   if (!is.null(t.test)) {
+    print('Running for t-test')
     tres <- multi.t.test(x = expr, pheno = p0, compare = t.test, 
                          fillNA = ttest.fillNA, method = method, ...)
     fData <- cbind(fData, tres)
