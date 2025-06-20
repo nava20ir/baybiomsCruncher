@@ -140,12 +140,16 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
                         additionalTabs = NULL, ESVObj = reactive(NULL), esetLoader = readESVObj, 
                         exprsGetter = getExprs, pDataGetter = getPData, fDataGetter = getFData, 
                         imputeGetter = getExprsImpute, defaultAxisGetter = getAx, 
-                        appName = "omicsViewer", appVersion = "1.1", imputationMethod = 'custom') 
+                        appName = "omicsViewer", appVersion = "1.7.0", imputationMethod = 'custom') 
 {
-  print('start of app module')
+ 
   ns <- session$ns
   observe({
     req(.dir())
+
+
+    
+    print(.dir())    
     ll <- list.files(.dir(), pattern = filePattern, ignore.case = TRUE)
     updateSelectizeInput(session = session, inputId = "selectFile", 
                          choices = ll, selected = "")
@@ -346,6 +350,7 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
   selectedSS <- reactiveVal()
   observe({
     ss <- input$tab_saveSS_cells_selected
+
     if (length(ss) == 0 || ss[2] > 0) 
       return(NULL)
     selectedSS(ss[1])
@@ -713,7 +718,7 @@ csc2list <- function (x)
     if (is.null(rownames(x)) || is.null(colnames(x))) 
       stop("csmlist: x need to have dimnames!")
     x[x == 0] <- NA
-    df <- melt(x, na.rm = TRUE)
+    df <- reshape2::melt(x, na.rm = TRUE)
     colnames(df) <- c("featureId", "gsId", "weight")
   }
   else if (inherits(x, "dgCMatrix")) {
@@ -1252,6 +1257,7 @@ factorIndependency_module <- function (input, output, session, x, y, reactive_ch
     req(reactive_checkpoint())
     tx <- table(x())
     ty <- table(y())
+
     if (length(tx) < 2 || length(ty) < 2 || max(tx) < 2 || 
         max(ty) < 2 || length(tx) > 12 || length(ty) > 12) 
       return(NULL)
@@ -1389,7 +1395,7 @@ feature_general_module <- function (input, output, session, reactive_expr, react
         l$tooltips <- colnames(reactive_expr())
     }
     if (showBeeswarm()) {
-      df <- melt(reactive_expr()[reactive_i(), , drop = FALSE])
+      df <- reshape2::melt(reactive_expr()[reactive_i(), , drop = FALSE])
       df$color <- rep(l$color, each = length(reactive_i()))
       df$pheno <- rep(pheno(), each = length(reactive_i()))
       xlab <- ""
@@ -1981,13 +1987,10 @@ gslist_module <- function (input, output, session, reactive_featureData, reactiv
   })
   tab <- reactive({
     req(reactive_pathway())
-    if (length(reactive_i()) == 1 && is.logical(reactive_i()) && 
-        reactive_i()) 
-      return(reactive_pathway())
-    if (length(reactive_i()) == 0 || is.na(reactive_i())) 
-      return(reactive_pathway())
-    df <- reactive_pathway()[reactive_pathway()$featureId %fin% 
-                               reactive_i(), ]
+    if (length(reactive_i()) == 1 && is.logical(reactive_i()) && reactive_i())   return(reactive_pathway())
+    if (length(reactive_i()) == 0 || all(is.na(reactive_i())))   return(reactive_pathway())
+
+    df <- reactive_pathway()[reactive_pathway()$featureId %fin%  reactive_i(), ]
     req(is.data.frame(df))
     df
   })
@@ -2940,6 +2943,7 @@ L1_data_space_module <- function (input, output, session, expr, pdata, fdata, re
                        selected = tb)
   })
   na2null <- function(x) {
+
     if (is.null(x) || is.na(x) || length(x) == 0) 
       return(NULL)
     x
@@ -3399,6 +3403,7 @@ multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'pe
 {
   print(paste0(' #### using the imputation method from multi.t.test #### ',method))
   x0 <- x
+
   if (is.vector(compare) || length(compare) == 3) 
     compare <- matrix(compare, nrow = 1)
   if (fillNA) 
@@ -4137,7 +4142,7 @@ plotly_boxplot <- function (x, i = NULL, highlight = NULL, ylab = "ylab", extvar
     if (nrow(m) > maxr) 
       m <- apply(m, 2, quantile, probs = seq(0, 1, by = 0.02), 
                  na.rm = TRUE)
-    df <- melt(m)
+    df <- reshape2::melt(m)
     hp <- colnames(m)[c]
     df$Cat <- c("n", "c")[as.integer(df$Var2 %in% hp) + 1]
     na.omit(df)
