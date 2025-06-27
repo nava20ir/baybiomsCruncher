@@ -3449,7 +3449,7 @@ multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'pe
       else md <- t$estimate[1] - t$estimate[2]
       res <- c(pvalue = t$p.value, mean.diff = md)
       # this is added to handle in case imputation is off
-      if ((length(xx[i1]) <= 1) | (length(xx[i2]) <= 1)) res['pvalue'] = 1
+      if (sum(!is.na(xx[i1])) <= 1 | sum(!is.na(xx[i2])) <= 1 ) res['pvalue'] = 1
       return(res)
     })
     
