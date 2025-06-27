@@ -888,7 +888,7 @@ module_normalization <- function (id, object, config)
             req(obj())
             selected = conf()$imputationMethod
             print(paste0('imputation method changed: ',selected))
-            cc <- c('chen-meng','perseus')
+            cc <- c('none','chen-meng','perseus')
             updateAwesomeRadio(session = session,
                 inputId = "imputationMethod",
                 choices = cc,
@@ -1184,7 +1184,7 @@ module_normalization_ui <- function (id, viewOnly = FALSE)
             label = "Select input data:", choices = "", selected = "",
             inline = FALSE),
             awesomeRadio(inputId = ns("imputationMethod"),
-            label = "Select imputation method:", choices = (c('custom','perseus')), selected = "perseus",
+            label = "Select imputation method - none will be only in t-test:", choices = (c('none','custom','perseus')), selected = "perseus",
             inline = FALSE),
             checkboxInput(ns("rowMax"), label = "Filtering proteins according to row max intensity"),
             conditionalPanel("input.rowMax == true", ns = ns,

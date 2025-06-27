@@ -1515,6 +1515,7 @@ fillNA <- function(x, method='perseus'){
     result = impute_custom(x)
   } else {
     result = impute_perseus(x)
+    
   }
 }, error = function(e) {
   message("Error caught: ", e$message)
@@ -4510,6 +4511,10 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
                              gs = NULL, stringDB = NULL, surv = NULL, SummarizedExperiment = TRUE) 
 {
   print('Running Preomics')
+  if (method == 'none') ttest.fillNA = F # if method is none we turn off imputation for the t-test
+  print('####')
+  print(paste0('this is the ttest.fillNA: ',ttest.fillNA))
+  print('####')
   p0 <- pData
   de <- dim(expr)
   if (nrow(pData) != de[2]) 
@@ -4553,7 +4558,7 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
     fData <- cbind(fData, pc$features)
   }
   if (!is.null(t.test)) {
-    print('Running for t-test')
+
     tres <- multi.t.test(x = expr, pheno = p0, compare = t.test, 
                          fillNA = ttest.fillNA, method = method, ...)
     fData <- cbind(fData, tres)
@@ -4973,6 +4978,8 @@ readESVObj  <- function (x)
 
 removeVarQC <- function (x, ref, positive = TRUE, ...) 
 {
+  tryCatch({
+  print('Running remove VarQC from omicsViewer')
   ls <- list(...)
   if (length(ls) > 0) 
     x <- normalize.nQuantiles(x, ...)
@@ -4984,7 +4991,13 @@ removeVarQC <- function (x, ref, positive = TRUE, ...)
   mm <- mm + rowMedians(x)
   if (positive) 
     mm[which(mm < 0)] <- 0
-  mm
+  return(mm) 
+
+  }, warning = function(w) {
+  print(paste0(w,'happened in svd'))
+  return(x)
+  }
+)
 }
 
 
@@ -5856,6 +5869,3 @@ vectORATall <- function (gs, i, background, minOverlap = 2, minSize = 2, maxSize
     warning("Unknown sort method, the results are not sorted!")
   rs
 }
-
-
-
