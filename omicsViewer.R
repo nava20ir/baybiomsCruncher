@@ -3430,6 +3430,9 @@ multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'pe
       df[[paste("quantile", i, j, sep = "|")]] <- rq
     }
   }
+
+
+  print('going for t-test')
   for (i in seq_len(nrow(compare))) {
     v <- compare[i, ]
     i1 <- which(pheno[[v[1]]] == v[2])
@@ -3444,8 +3447,12 @@ multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'pe
       if (length(t$estimate) == 1) 
         md <- t$estimate[[1]]
       else md <- t$estimate[1] - t$estimate[2]
-      c(pvalue = t$p.value, mean.diff = md)
+      res <- c(pvalue = t$p.value, mean.diff = md)
+      # this is added to handle in case imputation is off
+      if ((length(xx[i1]) <= 1) | (length(xx[i2]) <= 1)) res['pvalue'] = 1
+      return(res)
     })
+    
     pv <- tv[1, ]
     fdr <- p.adjust(pv, method = "fdr")
     df[[paste("ttest", paste(v[2], v[3], sep = "_vs_"), "pvalue", 
