@@ -1,5 +1,6 @@
 # the way chen did it is that MQCruncher is sitting on the top of omicsViewer. package I first deconvoluted omicsViewer as explained in wiki
 source('omicsViewer.R')
+source('run_DIA_gui.R')
 
 pars <- yaml::read_yaml("/home/shiny/app/lims.yaml")
 
@@ -165,8 +166,6 @@ getUPRefProteomeID <- function (domain = c("Eukaryota", "Archaea", "Bacteria", "
         2])
 }
 
-
-
 input_popup <- function (id, pars)
 {
     moduleServer(id, function(input, output, session) {
@@ -182,34 +181,41 @@ input_popup <- function (id, pars)
             title = "Acceptable file/format: mqpar.xml/.txt/.tsv",
             multiple = FALSE
             ),
-            checkboxInput(ns("checkbox_diann"), "Processing DIA-NN tsv file iBAQ and maxLFQ ", value = FALSE),
 
-            # Conditional radio buttons to select between the two coditions ibaq and maxLFQ
+            checkboxInput(ns("checkbox_diann"), "Processing DIA-NN tsv file iBAQ and maxLFQ ", value = FALSE),
+            br(),
             conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
-            radioButtons(
-                ns("intensity_option"),
-                "Choose method:",
-                choices = c("iBAQ", "maxLFQ"),
-                selected = "iBAQ"
+            shinyFilesButton(
+            id = ns("diannReportfile"),
+            label = "Select diann report tsv",
+            title = "Diann TSV file",
+            multiple = FALSE
             )
             ),
-            
-
-            # Show additional action button if checkbox is TRUE
+            br(),
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            shinyFilesButton(
+            id = ns("fastaFile"),
+            label = "Select FASTA file",
+            title = "FASTA file",
+            multiple = FALSE
+            )
+            ),
+            br(),
             conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
             actionButton(ns("run_diagui"), "Run DIA-GUI")
             ),
-            
             title = "Loading project ...",
-            footer = modalButton("Open"),
+            footer = tagList(modalButton("Cancel")),
             size = "m",
             easyClose = FALSE,
-            fade = TRUE,
-            style = "z-index: 9999"
+            fade = TRUE
         )
         )
+
 
         shinyFileChoose(
         input = input,
@@ -221,52 +227,75 @@ input_popup <- function (id, pars)
         restrictions = c("AnnotDB", "R-Portable-viewer")
         )
 
-          observeEvent(input$checkbox_diann, {
-             if (input$checkbox_diann) {
-             cat("Checkbox for DIANN is checked!\n")
-             } else {
-             cat("Checkbox for DIANN  is not checked.\n")
-             }
-         })
-        
+        shinyFileChoose(
+        input = input,
+        id = "diannReportfile",
+        roots = rt,
+        defaultRoot = names(rt)[1],
+        session = session,
+        filetypes = c("", "tsv"),
+        restrictions = c("AnnotDB", "R-Portable-viewer")
+        )
 
+        shinyFileChoose(
+        input = input,
+        id = "fastaFile",
+        roots = rt,
+        defaultRoot = names(rt)[1],
+        session = session,
+        filetypes = c("", "fasta","fa"),
+        restrictions = c("AnnotDB", "R-Portable-viewer")
+        )
+
+       
+
+        selected_diann_tsv <- reactive({
+            req(input$diannReportfile)
+            req(!inherits(input$diannReportfile, "integer"))
+            file_info <- parseFilePaths(rt, input$diannReportfile)
+            req(nrow(file_info) > 0)
+            normalizePath(as.character(file_info$datapath[1]))
+        })
+
+
+
+
+        selected_fasta_file <- reactive({
+            req(input$fastaFile)
+            req(!inherits(input$fastaFile, "integer"))
+            file_info <- parseFilePaths(rt, input$fastaFile)
+            req(nrow(file_info) > 0)
+            normalizePath(as.character(file_info$datapath[1]))
+        })
+
+        # the code to run dia-GUI should be put in here 
         observeEvent(input$run_diagui, {
-            selected_method <- input$intensity_option
-            
-            # You can use it however you like
-            cat("Advanced button pressed!\n")
-            cat("Selected method:", selected_method, "\n")
-            # whe should write the code for the gui here 
-            # Example: conditional logic
-            if (selected_method == "iBAQ") {
-                print('runnig with ibaq')
-            } else if (selected_method == "maxLFQ") {
-                print('running the mehtod for LFQ  ')
+            req(selected_diann_tsv())  # your diann tsv file
+            req(selected_fasta_file())  # your diann tsv file
+            cat("fasta file:", selected_fasta_file(), "\n")
+            cat("Diann file:", selected_diann_tsv(), "\n")
+            # Use both files in your downstream logic here
+        })
+
+
+
+        observeEvent(input$mqparOrYaml, { 
+        req(!inherits(input$mqparOrYaml, "integer"))       
+         removeModal()
             }
-        })
-
-
-
-        observeEvent(input$mqparOrYaml, {
-            req(!inherits(input$mqparOrYaml, "integer"))
-            cat('this is the value for mqpar file')
-            cat(rt[[input$mqparOrYaml$root]])
-            removeModal()
-        })
+        )
 
         reactive({
             req(input$mqparOrYaml)
             req(!inherits(input$mqparOrYaml, "integer"))
             v <- do.call(file.path, c(rt[[input$mqparOrYaml$root]],
                 unlist(input$mqparOrYaml$files, recursive = FALSE)))
-                cat('this is where we should calculated iBAQ and LFQ')
-                cat('this is the value of v')
+                print('showing normalized path')
                 cat(normalizePath(v))
             normalizePath(v)
         })
     })
 }
-
 
 
 landingPage_module <- function (id, codeTable)

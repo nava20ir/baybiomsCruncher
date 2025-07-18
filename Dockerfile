@@ -41,6 +41,13 @@ RUN R -e "install.packages('shiny')"
 RUN R -e "install.packages('shinyBS')"
 RUN R -e "install.packages('shinydashboard')"
 
+### DIA GUI installation tested inside the container
+RUN R -e 'BiocManager::install("pcaMethods")'
+RUN R -e 'BiocManager::install("impute")'
+RUN R -e 'install.packages("imputeLCMD")'
+RUN R -e 'devtools::install_github("mgerault/DIAgui")'
+
+
 #COPY  ./omicsViewer /usr/local/lib/R/site-library/omicsViewer
 
 #ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache # to force docker file to ignore cache
