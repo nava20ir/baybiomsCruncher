@@ -166,6 +166,7 @@ getUPRefProteomeID <- function (domain = c("Eukaryota", "Archaea", "Bacteria", "
         2])
 }
 
+
 input_popup <- function (id, pars)
 {
     moduleServer(id, function(input, output, session) {
@@ -200,7 +201,7 @@ input_popup <- function (id, pars)
             id = ns("fastaFile"),
             label = "Select FASTA file",
             title = "FASTA file",
-            multiple = FALSE
+            multiple = TRUE
             )
             ),
             br(),
@@ -254,7 +255,7 @@ input_popup <- function (id, pars)
             req(!inherits(input$diannReportfile, "integer"))
             file_info <- parseFilePaths(rt, input$diannReportfile)
             req(nrow(file_info) > 0)
-            normalizePath(as.character(file_info$datapath[1]))
+            as.character(file_info$datapath[1])
         })
 
 
@@ -265,15 +266,27 @@ input_popup <- function (id, pars)
             req(!inherits(input$fastaFile, "integer"))
             file_info <- parseFilePaths(rt, input$fastaFile)
             req(nrow(file_info) > 0)
-            normalizePath(as.character(file_info$datapath[1]))
+            lapply(file_info$datapath,
+            function(x)normalizePath(as.character(x)))
         })
 
         # the code to run dia-GUI should be put in here 
         observeEvent(input$run_diagui, {
             req(selected_diann_tsv())  # your diann tsv file
             req(selected_fasta_file())  # your diann tsv file
-            cat("fasta file:", selected_fasta_file(), "\n")
-            cat("Diann file:", selected_diann_tsv(), "\n")
+
+            fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
+            clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
+            # Write to a single output file
+            writeLines(clean_lines, con =file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
+            print(dirname(selected_diann_tsv()))
+            res <- baybioms_report_process(selected_diann_tsv(),
+            fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
+
+            write.table(res$ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+            write.table(res$max_lfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+
+
             # Use both files in your downstream logic here
         })
 
@@ -296,6 +309,7 @@ input_popup <- function (id, pars)
         })
     })
 }
+
 
 
 landingPage_module <- function (id, codeTable)
