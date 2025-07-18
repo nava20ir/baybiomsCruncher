@@ -173,23 +173,95 @@ input_popup <- function (id, pars)
         ns <- session$ns
         rt <- structure(normalizePath(unlist(pars$project_dir)),
             names = names(pars$project_dir))
-        showModal(modalDialog(shinyFilesButton(id = ns("mqparOrYaml"),
-            label = "Select input file", title = "Acceptable file/format: mqpar.xml/.txt",
-            multiple = FALSE), title = "Loading project ...",
-            footer = modalButton("Open"), size = "m", easyClose = FALSE,
-            fade = TRUE, style = "z-index: 9999"))
-        shinyFileChoose(input = input, id = "mqparOrYaml", roots = rt,
-            defaultRoot = names(rt)[1], session = session, filetypes = c("",
-                "xml", "txt"), restrictions = c("AnnotDB", "R-Portable-viewer"))
+
+        showModal(
+        modalDialog(
+            shinyFilesButton(
+            id = ns("mqparOrYaml"),
+            label = "Select input file",
+            title = "Acceptable file/format: mqpar.xml/.txt/.tsv",
+            multiple = FALSE
+            ),
+            checkboxInput(ns("checkbox_diann"), "Processing DIA-NN tsv file iBAQ and maxLFQ ", value = FALSE),
+
+            # Conditional radio buttons to select between the two coditions ibaq and maxLFQ
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            radioButtons(
+                ns("intensity_option"),
+                "Choose method:",
+                choices = c("iBAQ", "maxLFQ"),
+                selected = "iBAQ"
+            )
+            ),
+            
+
+            # Show additional action button if checkbox is TRUE
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            actionButton(ns("run_diagui"), "Run DIA-GUI")
+            ),
+            
+            title = "Loading project ...",
+            footer = modalButton("Open"),
+            size = "m",
+            easyClose = FALSE,
+            fade = TRUE,
+            style = "z-index: 9999"
+        )
+        )
+
+        shinyFileChoose(
+        input = input,
+        id = "mqparOrYaml",
+        roots = rt,
+        defaultRoot = names(rt)[1],
+        session = session,
+        filetypes = c("", "xml", "txt", "tsv"),
+        restrictions = c("AnnotDB", "R-Portable-viewer")
+        )
+
+          observeEvent(input$checkbox_diann, {
+             if (input$checkbox_diann) {
+             cat("Checkbox for DIANN is checked!\n")
+             } else {
+             cat("Checkbox for DIANN  is not checked.\n")
+             }
+         })
+        
+
+        observeEvent(input$run_diagui, {
+            selected_method <- input$intensity_option
+            
+            # You can use it however you like
+            cat("Advanced button pressed!\n")
+            cat("Selected method:", selected_method, "\n")
+            # whe should write the code for the gui here 
+            # Example: conditional logic
+            if (selected_method == "iBAQ") {
+                print('runnig with ibaq')
+            } else if (selected_method == "maxLFQ") {
+                print('running the mehtod for LFQ  ')
+            }
+        })
+
+
+
         observeEvent(input$mqparOrYaml, {
             req(!inherits(input$mqparOrYaml, "integer"))
+            cat('this is the value for mqpar file')
+            cat(rt[[input$mqparOrYaml$root]])
             removeModal()
         })
+
         reactive({
             req(input$mqparOrYaml)
             req(!inherits(input$mqparOrYaml, "integer"))
             v <- do.call(file.path, c(rt[[input$mqparOrYaml$root]],
                 unlist(input$mqparOrYaml$files, recursive = FALSE)))
+                cat('this is where we should calculated iBAQ and LFQ')
+                cat('this is the value of v')
+                cat(normalizePath(v))
             normalizePath(v)
         })
     })
@@ -1447,7 +1519,7 @@ module_submit_ui <- function (id, viewOnly = FALSE)
         tags$h3("Protein information"), DT::dataTableOutput(ns("fdataTab")))),
         column(6, wellPanel(style = "background: white; height: 800px",
         tags$h3("Miscellaneous"), selectInput(ns("fdata_cols"),
-        label = "ID column for STRING database query",
+        label = "ID column for STRING database querry ",
         choices = NULL, multiple = FALSE), selectInput(ns("ptm_cols"),
         label = "Sequence window for PTM motif analysis",
         choices = NULL, multiple = TRUE), tags$b("Outlier analysis"),
