@@ -47,6 +47,13 @@ RUN R -e 'BiocManager::install("impute")'
 RUN R -e 'install.packages("imputeLCMD")'
 RUN R -e 'devtools::install_github("mgerault/DIAgui")'
 
+RUN R -e 'install.packages("remotes")'
+RUN R -e 'remotes::install_version("vctrs", "0.5.2", repos = "https://cloud.r-project.org")'
+RUN R -e 'remotes::install_version("rlang", version = "1.0.6", repos = "https://cloud.r-project.org")'
+RUN R -e 'remotes::install_version("lifecycle", version = "1.0.3", repos = "https://cloud.r-project.org")'
+RUN R -e 'remotes::install_version("tidyselect", version = "1.2.0", repos = "https://cloud.r-project.org")'
+RUN R -e 'remotes::install_version("dplyr", version = "1.1.0", repos = "https://cloud.r-project.org")'
+
 
 #COPY  ./omicsViewer /usr/local/lib/R/site-library/omicsViewer
 
