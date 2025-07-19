@@ -1,5 +1,6 @@
 # the way chen did it is that MQCruncher is sitting on the top of omicsViewer. package I first deconvoluted omicsViewer as explained in wiki
 source('omicsViewer.R')
+source('run_DIA_gui.R')
 
 pars <- yaml::read_yaml("/home/shiny/app/lims.yaml")
 
@@ -166,30 +167,144 @@ getUPRefProteomeID <- function (domain = c("Eukaryota", "Archaea", "Bacteria", "
 }
 
 
-
 input_popup <- function (id, pars)
 {
     moduleServer(id, function(input, output, session) {
         ns <- session$ns
         rt <- structure(normalizePath(unlist(pars$project_dir)),
             names = names(pars$project_dir))
-        showModal(modalDialog(shinyFilesButton(id = ns("mqparOrYaml"),
-            label = "Select input file", title = "Acceptable file/format: mqpar.xml/.txt",
-            multiple = FALSE), title = "Loading project ...",
-            footer = modalButton("Open"), size = "m", easyClose = FALSE,
-            fade = TRUE, style = "z-index: 9999"))
-        shinyFileChoose(input = input, id = "mqparOrYaml", roots = rt,
-            defaultRoot = names(rt)[1], session = session, filetypes = c("",
-                "xml", "txt"), restrictions = c("AnnotDB", "R-Portable-viewer"))
-        observeEvent(input$mqparOrYaml, {
-            req(!inherits(input$mqparOrYaml, "integer"))
-            removeModal()
+
+        showModal(
+        modalDialog(
+            shinyFilesButton(
+            id = ns("mqparOrYaml"),
+            label = "Select input file",
+            title = "Acceptable file/format: mqpar.xml/.txt/.tsv",
+            multiple = FALSE
+            ),
+
+            checkboxInput(ns("checkbox_diann"), "Processing DIA-NN tsv file iBAQ and maxLFQ ", value = FALSE),
+            br(),
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            shinyFilesButton(
+            id = ns("diannReportfile"),
+            label = "Select diann report tsv",
+            title = "Diann TSV file",
+            multiple = FALSE
+            )
+            ),
+            br(),
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            shinyFilesButton(
+            id = ns("fastaFile"),
+            label = "Select FASTA file",
+            title = "FASTA file",
+            multiple = TRUE
+            )
+            ),
+            br(),
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            actionButton(ns("run_diagui"), "Run DIA-GUI")
+            ),
+            title = "Loading project ...",
+            footer = tagList(modalButton("Cancel")),
+            size = "m",
+            easyClose = FALSE,
+            fade = TRUE
+        )
+        )
+
+
+        shinyFileChoose(
+        input = input,
+        id = "mqparOrYaml",
+        roots = rt,
+        defaultRoot = names(rt)[1],
+        session = session,
+        filetypes = c("", "xml", "txt", "tsv"),
+        restrictions = c("AnnotDB", "R-Portable-viewer")
+        )
+
+        shinyFileChoose(
+        input = input,
+        id = "diannReportfile",
+        roots = rt,
+        defaultRoot = names(rt)[1],
+        session = session,
+        filetypes = c("", "tsv"),
+        restrictions = c("AnnotDB", "R-Portable-viewer")
+        )
+
+        shinyFileChoose(
+        input = input,
+        id = "fastaFile",
+        roots = rt,
+        defaultRoot = names(rt)[1],
+        session = session,
+        filetypes = c("", "fasta","fa"),
+        restrictions = c("AnnotDB", "R-Portable-viewer")
+        )
+
+       
+
+        selected_diann_tsv <- reactive({
+            req(input$diannReportfile)
+            req(!inherits(input$diannReportfile, "integer"))
+            file_info <- parseFilePaths(rt, input$diannReportfile)
+            req(nrow(file_info) > 0)
+            as.character(file_info$datapath[1])
         })
+
+
+
+
+        selected_fasta_file <- reactive({
+            req(input$fastaFile)
+            req(!inherits(input$fastaFile, "integer"))
+            file_info <- parseFilePaths(rt, input$fastaFile)
+            req(nrow(file_info) > 0)
+            lapply(file_info$datapath,
+            function(x)normalizePath(as.character(x)))
+        })
+
+        # the code to run dia-GUI should be put in here 
+        observeEvent(input$run_diagui, {
+            req(selected_diann_tsv())  # your diann tsv file
+            req(selected_fasta_file())  # your diann tsv file
+
+            fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
+            clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
+            # Write to a single output file
+            writeLines(clean_lines, con =file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
+            print(dirname(selected_diann_tsv()))
+            res <- baybioms_report_process(selected_diann_tsv(),
+            fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
+
+            write.table(res$ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+            write.table(res$max_lfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+
+
+            # Use both files in your downstream logic here
+        })
+
+
+
+        observeEvent(input$mqparOrYaml, { 
+        req(!inherits(input$mqparOrYaml, "integer"))       
+         removeModal()
+            }
+        )
+
         reactive({
             req(input$mqparOrYaml)
             req(!inherits(input$mqparOrYaml, "integer"))
             v <- do.call(file.path, c(rt[[input$mqparOrYaml$root]],
                 unlist(input$mqparOrYaml$files, recursive = FALSE)))
+                print('showing normalized path')
+                cat(normalizePath(v))
             normalizePath(v)
         })
     })
@@ -1447,7 +1562,7 @@ module_submit_ui <- function (id, viewOnly = FALSE)
         tags$h3("Protein information"), DT::dataTableOutput(ns("fdataTab")))),
         column(6, wellPanel(style = "background: white; height: 800px",
         tags$h3("Miscellaneous"), selectInput(ns("fdata_cols"),
-        label = "ID column for STRING database query",
+        label = "ID column for STRING database querry ",
         choices = NULL, multiple = FALSE), selectInput(ns("ptm_cols"),
         label = "Sequence window for PTM motif analysis",
         choices = NULL, multiple = TRUE), tags$b("Outlier analysis"),
