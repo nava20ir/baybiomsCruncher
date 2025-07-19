@@ -274,20 +274,39 @@ input_popup <- function (id, pars)
         observeEvent(input$run_diagui, {
             req(selected_diann_tsv())  # your diann tsv file
             req(selected_fasta_file())  # your diann tsv file
+            log_file = file.path(dirname(selected_diann_tsv()), 'dia_gui_log.txt')
+            con <- file(log_file, open = "a")
+            sink(con, type = 'output')            # redirect output
+            sink(con, type = "message")  # redirect messages
+
+            cat("DIA-NN GUI started at ", Sys.time(), "\n")
+            cat("making FASTA  ", Sys.time(), "\n")
+
+
 
             fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
             clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
+            cat("writing FASTA finsihed  ", Sys.time(), "\n")
+
             # Write to a single output file
             writeLines(clean_lines, con =file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
-            print(dirname(selected_diann_tsv()))
+
+            cat(dirname(selected_diann_tsv()))
+            cat("starting calculation of iBAQ and maxLFQ  ", Sys.time(), "\n")
+
             res <- baybioms_report_process(selected_diann_tsv(),
             fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
+            cat("making generated tables  ", Sys.time(), "\n")
 
             write.table(res$ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
             write.table(res$max_lfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+            cat("DIA_GUI job finsised  ", Sys.time(), "\n")
 
+            # End logging
+            sink(type = "message")
+            sink()
+            close(con)
 
-            # Use both files in your downstream logic here
         })
 
 
