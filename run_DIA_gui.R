@@ -193,7 +193,7 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
     }
   }
   iq_report <- iq_report[,c((nc+1):ncol(iq_report), 1:nc)]  # reorder columns
-  max_lfq <<- iq_report
+  #max_lfq <<- iq_report
   
   if(get_iBAQ & header.id == "Protein.Group"){
     if(!is.null(fasta)){
