@@ -183,7 +183,7 @@ input_popup <- function (id, pars)
             multiple = FALSE
             ),
 
-            checkboxInput(ns("checkbox_diann"), "Processing DIA-NN tsv file iBAQ and maxLFQ ", value = FALSE),
+            checkboxInput(ns("checkbox_diann"), "DIA-NN work flow", value = FALSE),
             br(),
             conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
@@ -209,13 +209,18 @@ input_popup <- function (id, pars)
             condition = sprintf("input['%s']", ns("checkbox_diann")),
             actionButton(ns("run_diagui"), "Run DIA-GUI")
             ),
+	    br(),
+  	    conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            verbatimTextOutput(ns("log_output"))
+            ),		    
             title = "Loading project ...",
             footer = tagList(modalButton("Cancel")),
             size = "m",
             easyClose = FALSE,
             fade = TRUE
-        )
-        )
+            )
+            )
 
 
         shinyFileChoose(
@@ -255,6 +260,7 @@ input_popup <- function (id, pars)
             req(!inherits(input$diannReportfile, "integer"))
             file_info <- parseFilePaths(rt, input$diannReportfile)
             req(nrow(file_info) > 0)
+	    log_content("diann report file uploaded")
             as.character(file_info$datapath[1])
         })
 
@@ -266,47 +272,60 @@ input_popup <- function (id, pars)
             req(!inherits(input$fastaFile, "integer"))
             file_info <- parseFilePaths(rt, input$fastaFile)
             req(nrow(file_info) > 0)
+	    log_content("FASTA file(s) uploaded")
             lapply(file_info$datapath,
             function(x)normalizePath(as.character(x)))
         })
+
+
+
+	log_content <- reactiveVal("")
+	output$log_output <- renderText({
+  		log_content()
+	})
 
         # the code to run dia-GUI should be put in here 
         observeEvent(input$run_diagui, {
             req(selected_diann_tsv())  # your diann tsv file
             req(selected_fasta_file())  # your diann tsv file
-            log_file = file.path(dirname(selected_diann_tsv()), 'dia_gui_log.txt')
-            con <- file(log_file, open = "a")
-            sink(con, type = 'output')            # redirect output
-            sink(con, type = "message")  # redirect messages
+	    log_file = file.path(dirname(selected_diann_tsv()), 'dia_gui_log.txt')
+	    con <- file(log_file, open = "a")
+	    sink(con, type = 'output')            # redirect output
+	    sink(con, type = "message")  # redirect messages
 
-            cat("DIA-NN GUI started at ", Sys.time(), "\n")
-            cat("making FASTA  ", Sys.time(), "\n")
+	    cat("DIA-NN GUI started at ", Sys.time(), "\n")
+            log_content("Started DIA-GUI...\nProcessing...")
+
+	    cat("making FASTA  ", Sys.time(), "\n")
+	    log_content("making FASTA...\nProcessing...")
 
 
 
             fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
             clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
-            cat("writing FASTA finsihed  ", Sys.time(), "\n")
+	    cat("writing FASTA finsihed  ", Sys.time(), "\n")
+      	    log_content("Writing FASRA...\nProcessing...")
 
             # Write to a single output file
             writeLines(clean_lines, con =file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
 
             cat(dirname(selected_diann_tsv()))
-            cat("starting calculation of iBAQ and maxLFQ  ", Sys.time(), "\n")
+	    cat("starting calculation of iBAQ and maxLFQ  ", Sys.time(), "\n")
 
             res <- baybioms_report_process(selected_diann_tsv(),
             fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
-            cat("making generated tables  ", Sys.time(), "\n")
+	    cat("making generated tables  ", Sys.time(), "\n")
 
             write.table(res$ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
             write.table(res$max_lfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
-            cat("DIA_GUI job finsised  ", Sys.time(), "\n")
+	    cat("DIA_GUI job finsised  ", Sys.time(), "\n")
+	    log_content("Finished DIA-GUI")
 
-            # End logging
-            sink(type = "message")
-            sink()
+  	    # End logging
+  	    sink(type = "message")
+ 	    sink()
             close(con)
-
+            
         })
 
 
@@ -327,6 +346,7 @@ input_popup <- function (id, pars)
             normalizePath(v)
         })
     })
+
 }
 
 
