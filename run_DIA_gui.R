@@ -162,6 +162,8 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
     #other element is annotation, depends on your data
     # quick handle of data  --> add column protein group and put it at the beginning, remove rownames
     iq_report <- as.data.frame(iq_report)
+    iq_report = 2^ iq_report # anti log of intensity values
+
     iq_report <- iq_report[order(rownames(iq_report)),]
     
     if(get_Top3){
