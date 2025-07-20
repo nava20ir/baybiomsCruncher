@@ -320,8 +320,8 @@ input_popup <- function (id, pars)
         # the code to run dia-GUI should be put in here 
         observeEvent(input$run_diagui, {
 
-            req(selected_diann_tsv())  # your diann tsv file
-            req(selected_fasta_file())  # your diann tsv file
+        req(selected_diann_tsv())  # your diann tsv file
+        req(selected_fasta_file())  # your diann tsv file
 	    req(selected_raw2expr())
 	    log_content('wait')
 	    mapping_df = read_mapping_raw2expr(selected_raw2expr())
@@ -332,34 +332,50 @@ input_popup <- function (id, pars)
 	    sink(con, type = "message")  # redirect messages
 
 	    cat("DIA-NN GUI started at ", Sys.time(), "\n")
-            #log_content("Started DIA-GUI...\nProcessing...")
+        #log_content("Started DIA-GUI...\nProcessing...")
 
 	    cat("making FASTA  ", Sys.time(), "\n")
 	    #log_content("making FASTA...\nProcessing...")
 	    
 	    mapping_csv <- read.csv(selected_raw2expr()) # reading experiment design mapping file
 
-            fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
-            clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
+        fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
+        clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
 	    
 	    cat("writing FASTA finsihed  ", Sys.time(), "\n")
-      	    log_content("Writing FASRA...\nProcessing...")
+        log_content("Writing FASRA...\nProcessing...")
 
-            # Write to a single output file
-            writeLines(clean_lines, con =file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
+        # Write to a single output file
+        writeLines(clean_lines, con =file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
 
-            cat(dirname(selected_diann_tsv()))
+        cat(dirname(selected_diann_tsv()))
 	    cat("starting calculation of iBAQ and maxLFQ  ", Sys.time(), "\n")
 
-            res <- baybioms_report_process(selected_diann_tsv(),
-            fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
+        res <- baybioms_report_process(selected_diann_tsv(),
+        fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
 	    cat("making generated tables  ", Sys.time(), "\n")
 
 	    final_ibaq = make_final_ibaq(mapping_df,res$ibaq)
 	    final_maxlfq = make_final_maxlfq(mapping_df,res$max_lfq)
 
-            write.table(final_ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
-            write.table(final_maxlfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+        ibaq_folder_path <- file.path(dirname(selected_diann_tsv()), 'dia_ibaq')
+        maxlfq_folder_path <- file.path(dirname(selected_diann_tsv()), 'dia_maxlfq')
+
+        if (!dir.exists(ibaq_folder_path)) {
+            dir.create(ibaq_folder_path)
+        }
+
+        if (!dir.exists(maxlfq_folder_path)) {
+            dir.create(maxlfq_folder_path)
+        }
+
+
+        write.table(final_ibaq, file = file.path(ibaq_folder_path, 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+        write.table(final_maxlfq, file = file.path(maxlfq_folder_path, 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+
+        #write.table(res$ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+        #write.table(res$max_lfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+
 	    cat("DIA_GUI job finsised  ", Sys.time(), "\n")
 	    log_content("Finished DIA-GUI")
 
