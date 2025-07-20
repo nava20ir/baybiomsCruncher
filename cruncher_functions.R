@@ -1,6 +1,9 @@
 # the way chen did it is that MQCruncher is sitting on the top of omicsViewer. package I first deconvoluted omicsViewer as explained in wiki
 source('omicsViewer.R')
-source('run_DIA_gui.R')
+source('run_DIA_gui.R') # to calculte maxLFQ using iq and iBAQ with DIA-GUI package
+source('map2expr.R') # for mapping raw files to experiment names
+
+
 
 pars <- yaml::read_yaml("/home/shiny/app/lims.yaml")
 
@@ -176,15 +179,18 @@ input_popup <- function (id, pars)
 
         showModal(
         modalDialog(
-            shinyFilesButton(
-            id = ns("mqparOrYaml"),
-            label = "Select input file",
-            title = "Acceptable file/format: mqpar.xml/.txt/.tsv",
-            multiple = FALSE
-            ),
-
             checkboxInput(ns("checkbox_diann"), "DIA-NN work flow", value = FALSE),
             br(),
+	    conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            shinyFilesButton(
+            id = ns("mappingFile"),
+            label = "Select mapping csv file between RAW and experiments",
+            title = "experiment CSV file",
+            multiple = FALSE
+            )
+            ),
+	    br(),
             conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
             shinyFilesButton(
@@ -213,7 +219,14 @@ input_popup <- function (id, pars)
   	    conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
             verbatimTextOutput(ns("log_output"))
-            ),		    
+            ),
+            shinyFilesButton(
+            id = ns("mqparOrYaml"),
+            label = "Select input file",
+            title = "Acceptable file/format: mqpar.xml/.txt/.tsv",
+            multiple = FALSE
+            ),
+
             title = "Loading project ...",
             footer = tagList(modalButton("Cancel")),
             size = "m",
@@ -222,14 +235,13 @@ input_popup <- function (id, pars)
             )
             )
 
-
         shinyFileChoose(
         input = input,
-        id = "mqparOrYaml",
+        id = "mappingFile",
         roots = rt,
         defaultRoot = names(rt)[1],
         session = session,
-        filetypes = c("", "xml", "txt", "tsv"),
+        filetypes = c("", "csv"),
         restrictions = c("AnnotDB", "R-Portable-viewer")
         )
 
@@ -252,8 +264,29 @@ input_popup <- function (id, pars)
         filetypes = c("", "fasta","fa"),
         restrictions = c("AnnotDB", "R-Portable-viewer")
         )
+        shinyFileChoose(
+        input = input,
+        id = "mqparOrYaml",
+        roots = rt,
+        defaultRoot = names(rt)[1],
+        session = session,
+        filetypes = c("", "xml", "txt", "tsv"),
+        restrictions = c("AnnotDB", "R-Portable-viewer")
+        )
 
        
+
+        selected_raw2expr <- reactive({
+            req(input$mappingFile)
+            req(!inherits(input$mappingFile, "integer"))
+            file_info <- parseFilePaths(rt, input$mappingFile)
+            req(nrow(file_info) > 0)
+            log_content("mapping file uploaded")
+            as.character(file_info$datapath[1])
+        })
+
+
+
 
         selected_diann_tsv <- reactive({
             req(input$diannReportfile)
@@ -279,30 +312,36 @@ input_popup <- function (id, pars)
 
 
 
-	log_content <- reactiveVal("")
+	log_content <- reactiveVal("inactive")
 	output$log_output <- renderText({
   		log_content()
 	})
 
         # the code to run dia-GUI should be put in here 
         observeEvent(input$run_diagui, {
+
             req(selected_diann_tsv())  # your diann tsv file
             req(selected_fasta_file())  # your diann tsv file
+	    req(selected_raw2expr())
+	    log_content('wait')
+	    mapping_df = read_mapping_raw2expr(selected_raw2expr())
+
 	    log_file = file.path(dirname(selected_diann_tsv()), 'dia_gui_log.txt')
 	    con <- file(log_file, open = "a")
 	    sink(con, type = 'output')            # redirect output
 	    sink(con, type = "message")  # redirect messages
 
 	    cat("DIA-NN GUI started at ", Sys.time(), "\n")
-            log_content("Started DIA-GUI...\nProcessing...")
+            #log_content("Started DIA-GUI...\nProcessing...")
 
 	    cat("making FASTA  ", Sys.time(), "\n")
-	    log_content("making FASTA...\nProcessing...")
-
-
+	    #log_content("making FASTA...\nProcessing...")
+	    
+	    mapping_csv <- read.csv(selected_raw2expr()) # reading experiment design mapping file
 
             fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
             clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
+	    
 	    cat("writing FASTA finsihed  ", Sys.time(), "\n")
       	    log_content("Writing FASRA...\nProcessing...")
 
@@ -316,8 +355,11 @@ input_popup <- function (id, pars)
             fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
 	    cat("making generated tables  ", Sys.time(), "\n")
 
-            write.table(res$ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
-            write.table(res$max_lfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+	    final_ibaq = make_final_ibaq(mapping_df,res$ibaq)
+	    final_maxlfq = make_final_maxlfq(mapping_df,res$max_lfq)
+
+            write.table(final_ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
+            write.table(final_maxlfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
 	    cat("DIA_GUI job finsised  ", Sys.time(), "\n")
 	    log_content("Finished DIA-GUI")
 
@@ -348,6 +390,7 @@ input_popup <- function (id, pars)
     })
 
 }
+
 
 
 
