@@ -71,7 +71,8 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
       message(paste(i, "is not in your colnames data. Check the id you want to add."))
     }
   }
-  iq_report <- iq_report[,c((nc+1):ncol(iq_report), 1:nc)]  # reorder columns
+
+    iq_report <- iq_report[,c((nc+1):ncol(iq_report), 1:nc)]  # reorder columns
 
     d_seq <- getallseq(pr_id = iq_report$Protein.Group,
                        fasta_file = TRUE,
@@ -86,15 +87,15 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
                          q = qv, protein.q = p.qv,
                          pg.q = pg.qv, gg.q = gg.qv,
                          method = "sum")
-    brut$Genes <- NA
-    brut$Protein.Names <- NA
+    
     brut <- get_iBAQ(brut, proteinDB = d_seq,
                      id_name = "Protein.Group",
-                     ecol = n_info:(n_cond+1),
+                     #ecol = n_info:(n_cond+1),
+		     ecol = grep(colnames(brut),pattern = '.raw'),
                      peptideLength = peptide_length,
-                     proteaseRegExp = getProtease("trypsin"),
+                     proteaseRegExp = getProtease("trypsin"),keep_original = FALSE,
                      log2_transformed = FALSE)
-    brut <- brut[,-c(n_info:(n_cond+1))]
+    
     
   return(list('ibaq'=brut,'max_lfq'=iq_report))
   
