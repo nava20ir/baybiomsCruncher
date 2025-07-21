@@ -216,8 +216,8 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
                          q = qv, protein.q = p.qv,
                          pg.q = pg.qv, gg.q = gg.qv,
                          method = "sum")
-    brut$Genes <- NULL
-    brut$Protein.Names <- NULL
+    brut$Genes <- "n.d."
+    brut$Protein.Names <- "n.d."
     brut <- get_iBAQ(brut, proteinDB = d_seq,
                      id_name = "Protein.Group",
                      ecol = n_info:(n_cond+1),
