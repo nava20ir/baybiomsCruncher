@@ -1,17 +1,46 @@
 
 library(DIAgui)
 
+library(DIAgui)
+
+mapping_expr_raw_file_2_name <- function(mapping_csv,dian_sourcec){
+  mapping_csv$name = gsub(mapping_csv$name,pattern = '.raw',replacement ='')
+  
+  mapping_dic <- as.character(mapping_csv$mapping)
+
+  names(mapping_dic) <- as.character(mapping_csv$name)
+  dian_sourcec$File.Name <- sapply(dian_sourcec$Run, function(x)mapping_dic[x])
+  
+return(dian_sourcec)
+
+}
+
+
 baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id = "File.Name",
                                     quantity.id = "Precursor.Normalised", secondary.id = "Precursor.Id",
                                     id_to_add = c("Protein.Names", "First.Protein.Description", "Genes"),
                                     qv = 0.01, pg.qv = 0.01, p.qv = 1, gg.qv = 1, quality = 0.8,
                                     only_proteotypic = FALSE,
                                     get_pep = TRUE, only_pepall = FALSE, get_Top3 = FALSE, get_iBAQ = TRUE,
-                                    fasta = NULL, species = NULL, peptide_length = c(5,36),
+                                    fasta = NULL, species = NULL, peptide_length = c(5,36), mapping_dic = NULL,
                                     format = c("xlsx", "csv", "txt")){
 
   
-  report <- diann_load(data)  #load your report file
+  report_raw <- diann_load(data)  #load your report file
+  
+  if (!is.null(mapping_dic)){
+     tryCatch({
+       report <- mapping_expr_raw_file_2_name(mapping_dic,report_raw)
+      
+       
+     }, warning = function(w) {
+       message("Warning: ", conditionMessage(w))
+      report = report_raw
+     })
+   }
+ 
+  
+
   brut <- report
   
   if(header.id == "Protein.Group" | header.id == "Genes"){
@@ -47,6 +76,9 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
     # pc$peptides_counts_all <- unname(apply(pc, 1, max))
     # pc <- pc[,c(ncol(pc), 1:(ncol(pc)-1))]
   
+  
+
+
     iq_report <- iq::fast_MaxLFQ(iq_report) #return a list, check it, call element with '$'
     iq_report <- iq_report$estimate #estimate is the dataset
     iq_report <- as.data.frame(iq_report)
@@ -55,6 +87,8 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
     #iq_report$peptides_counts_all <- pc$peptides_counts_all
     #iq_report <- cbind(iq_report, pc)
     
+  
+  
   ### Add gene names and other informations; reshape data frame
   nc <- ncol(iq_report)
   iq_report[[header.id]] <- rownames(iq_report)
@@ -62,19 +96,18 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
   
   report <- report[(report[[header.id]] %in% iq_report[[header.id]]),]
   report <- report[order(report[[header.id]]),]
+  
   col_n <- colnames(report)
+  
   for(i in id_to_add){
     if(i %in% col_n){
       iq_report[[i]] <- unique(report[,c(header.id, i)])[[i]]
     }
-    else{
-      message(paste(i, "is not in your colnames data. Check the id you want to add."))
-    }
   }
+  
+  iq_report <- iq_report[,c((nc+1):ncol(iq_report), 1:nc)]  # reorder columns
 
-    iq_report <- iq_report[,c((nc+1):ncol(iq_report), 1:nc)]  # reorder columns
-
-    d_seq <- getallseq(pr_id = iq_report$Protein.Group,
+  d_seq <- getallseq(pr_id = iq_report$Protein.Group,
                        fasta_file = TRUE,
                        bank_name = fasta)
 
@@ -83,19 +116,27 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
     brut <- diann_matrix(brut, sample.header = sample.id,
                          id.header = "Protein.Group",
                          quantity.header = "Precursor.Quantity",
-                         proteotypic.only = FALSE,
+                         proteotypic.only = TRUE,
                          q = qv, protein.q = p.qv,
                          pg.q = pg.qv, gg.q = gg.qv,
                          method = "sum")
     
+    
+
+    print(n_info)
+    print(n_cond)
+    print(colnames(brut))
+    print(which(colnames(brut) %in% mapping_csv$mapping))
+    
     brut <- get_iBAQ(brut, proteinDB = d_seq,
                      id_name = "Protein.Group",
                      #ecol = n_info:(n_cond+1),
-		     ecol = grep(colnames(brut),pattern = '.raw'),
+                     ecol = which(colnames(brut) %in% mapping_csv$mapping),
                      peptideLength = peptide_length,
                      proteaseRegExp = getProtease("trypsin"),keep_original = FALSE,
                      log2_transformed = FALSE)
     
+   #brut <- brut[,-c(n_info:(n_cond+1))]
     
   return(list('ibaq'=brut,'max_lfq'=iq_report))
   
