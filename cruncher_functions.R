@@ -351,12 +351,15 @@ input_popup <- function (id, pars)
         cat(dirname(selected_diann_tsv()))
 	    cat("starting calculation of iBAQ and maxLFQ  ", Sys.time(), "\n")
 
-        res <- baybioms_report_process(selected_diann_tsv(),
-        fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
+        res <- baybioms_report_process(
+                    selected_diann_tsv(),
+                    fasta=file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'),
+                    mapping_dic = mapping_df 
+        )
 	    cat("making generated tables  ", Sys.time(), "\n")
 
-	    final_ibaq = make_final_ibaq(mapping_df,res$ibaq)
-	    final_maxlfq = make_final_maxlfq(mapping_df,res$max_lfq)
+	    final_ibaq = res$ibaq
+	    final_maxlfq = res$max_lfq
 
         ibaq_folder_path <- file.path(dirname(selected_diann_tsv()), 'dia_ibaq')
         maxlfq_folder_path <- file.path(dirname(selected_diann_tsv()), 'dia_maxlfq')
