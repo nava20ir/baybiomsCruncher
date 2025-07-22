@@ -126,12 +126,12 @@ baybioms_report_process <- function(data, header.id = "Protein.Group", sample.id
     print(n_info)
     print(n_cond)
     print(colnames(brut))
-    print(which(colnames(brut) %in% mapping_csv$mapping))
+    print(which(colnames(brut) %in% mapping_dic$mapping))
     
     brut <- get_iBAQ(brut, proteinDB = d_seq,
                      id_name = "Protein.Group",
                      #ecol = n_info:(n_cond+1),
-                     ecol = which(colnames(brut) %in% mapping_csv$mapping),
+                     ecol = which(colnames(brut) %in% mapping_dic$mapping),
                      peptideLength = peptide_length,
                      proteaseRegExp = getProtease("trypsin"),keep_original = FALSE,
                      log2_transformed = FALSE)
