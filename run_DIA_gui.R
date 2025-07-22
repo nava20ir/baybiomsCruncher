@@ -118,11 +118,6 @@ baybioms_report_process <- function(data, header.id = "Protein.Group",
 
 
 
-dian_tsv  = '/Projects/002_Proteomics/P376_Lorenzo_and_Claassens_DnaAcos/P376_02/amir_dian_test/results.tsv'
-fasta_file = '/Projects/002_Proteomics/P376_Lorenzo_and_Claassens_DnaAcos/P376_02/amir_dian_test/dia_gui.fasta'
-mapping_csv = read.csv('/Projects/002_Proteomics/P376_Lorenzo_and_Claassens_DnaAcos/P376_02/amir_dian_test/mapping.csv')
-res = baybioms_report_process(dian_tsv,fasta = fasta_file,mapping_dic=mapping_csv)
-ibaq = res$ibaq ; maxLFQ = res$max_lfq
 
 
 
