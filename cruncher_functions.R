@@ -176,12 +176,22 @@ input_popup <- function (id, pars)
         ns <- session$ns
         rt <- structure(normalizePath(unlist(pars$project_dir)),
             names = names(pars$project_dir))
-
+        # show modal for the input files DIA
         showModal(
         modalDialog(
             checkboxInput(ns("checkbox_diann"), "DIA-NN work flow", value = FALSE),
             br(),
-	    conditionalPanel(
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            radioButtons(
+                inputId = ns("method"),
+                label = "Choose method",
+                choices = c("DIA-NN ProteinGroup file" = "pg", "DIA-NN Report file" = "psm"),
+                selected = "pg"
+            )
+            ),
+            br(),
+	        conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
             shinyFilesButton(
             id = ns("mappingFile"),
@@ -190,19 +200,23 @@ input_popup <- function (id, pars)
             multiple = FALSE
             )
             ),
-	    br(),
+	        br(),
             conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
             shinyFilesButton(
             id = ns("diannReportfile"),
-            label = "Select diann report tsv",
-            title = "Diann TSV file",
+            label = "Select diann input",
+            title = "DIA-NN input file",
             multiple = FALSE
             )
             ),
             br(),
             conditionalPanel(
-            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            condition = sprintf(
+                "input['%s'] && input['%s'] === 'psm'",
+                ns("checkbox_diann"),
+                ns("method")
+            ),
             shinyFilesButton(
             id = ns("fastaFile"),
             label = "Select FASTA file",
@@ -213,7 +227,7 @@ input_popup <- function (id, pars)
             br(),
             conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
-            actionButton(ns("run_diagui"), "Run DIA-GUI")
+            actionButton(ns("run_diagui"), "  RUN DIA preparation ")
             ),
 	    br(),
   	    conditionalPanel(
@@ -247,14 +261,14 @@ input_popup <- function (id, pars)
 
         shinyFileChoose(
         input = input,
-        id = "diannReportfile",
+        id = "diannReportfile or dianProteinGroup file",
         roots = rt,
         defaultRoot = names(rt)[1],
         session = session,
         filetypes = c("", "tsv"),
         restrictions = c("AnnotDB", "R-Portable-viewer")
         )
-
+        # this is the fasta file selection tool
         shinyFileChoose(
         input = input,
         id = "fastaFile",
@@ -312,10 +326,10 @@ input_popup <- function (id, pars)
 
 
 
-	log_content <- reactiveVal("inactive")
-	output$log_output <- renderText({
-  		log_content()
-	})
+        log_content <- reactiveVal("inactive")
+        output$log_output <- renderText({
+            log_content()
+        })
 
         # the code to run dia-GUI should be put in here 
         observeEvent(input$run_diagui, {
@@ -325,18 +339,12 @@ input_popup <- function (id, pars)
 	    req(selected_raw2expr())
 	    log_content('wait')
 	    mapping_df = read_mapping_raw2expr(selected_raw2expr())
-
 	    log_file = file.path(dirname(selected_diann_tsv()), 'dia_gui_log.txt')
 	    con <- file(log_file, open = "a")
 	    sink(con, type = 'output')            # redirect output
 	    sink(con, type = "message")  # redirect messages
-
 	    cat("DIA-NN GUI started at ", Sys.time(), "\n")
-        #log_content("Started DIA-GUI...\nProcessing...")
-
 	    cat("making FASTA  ", Sys.time(), "\n")
-	    #log_content("making FASTA...\nProcessing...")
-	    
 	    mapping_csv <- read.csv(selected_raw2expr()) # reading experiment design mapping file
 
         fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
@@ -347,7 +355,6 @@ input_popup <- function (id, pars)
 
         # Write to a single output file
         writeLines(clean_lines, con =file.path(dirname(selected_diann_tsv()), 'dia_gui.fasta'))
-
         cat(dirname(selected_diann_tsv()))
 	    cat("starting calculation of iBAQ and maxLFQ  ", Sys.time(), "\n")
 
@@ -375,10 +382,6 @@ input_popup <- function (id, pars)
 
         write.table(final_ibaq, file = file.path(ibaq_folder_path, 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
         write.table(final_maxlfq, file = file.path(maxlfq_folder_path, 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
-
-        #write.table(res$ibaq, file = file.path(dirname(selected_diann_tsv()), 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
-        #write.table(res$max_lfq, file = file.path(dirname(selected_diann_tsv()), 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
-
 	    cat("DIA_GUI job finsised  ", Sys.time(), "\n")
 	    log_content("Finished DIA-GUI")
 
