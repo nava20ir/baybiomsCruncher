@@ -1,14 +1,10 @@
 library(DIAgui)
 
 
-
-
-make_final_pg <- function(dian_tsv_path,mapping_csv_path){
+make_final_pg <- function(dian_tsv_path,mapping_csv_path)
+{
 df <- as.data.frame(data.table::fread(dian_tsv_path, stringsAsFactors = FALSE))
 mapping_csv = read.csv(mapping_csv_path,stringsAsFactors = F)
-
-
-
 
 mapcolname2exp <- function(x,mapping_csv){
   if (x %in% mapping_csv$name) {
@@ -25,15 +21,11 @@ window2linux <- function(windows_path){
   
 }
 
-
 colnames(df) = sapply(colnames(df),function(x)window2linux(x))
 colnames(df) = sapply(colnames(df),function(x)mapcolname2exp(x,mapping_csv))
-
-
 df = df[,c(setdiff(colnames(df),mapping_csv$mapping),mapping_csv$mapping)]
 return(df)
 }
-
 
 
 
@@ -72,7 +64,7 @@ baybioms_report_process <- function(data, header.id = "Protein.Group",
 
   
   if (is.null(mapping_dic)) stop('no mapping data') 
-  if (!all(c('name','mapping') %in% colnames(mapping_csv))) stop('Two columns: raw and mapping should exist in mapping file')
+  if (!all(c('name','mapping') %in% colnames(mapping_dic))) stop('Two columns: raw and mapping should exist in mapping file')
   report_raw <- diann_load(data)  #load your report file
   
    tryCatch({
@@ -142,7 +134,7 @@ baybioms_report_process <- function(data, header.id = "Protein.Group",
     brut <- get_iBAQ(brut, proteinDB = d_seq,
                      id_name = "Protein.Group",
                      #ecol = n_info:(n_cond+1),
-                     ecol = which(colnames(brut) %in% mapping_csv$mapping),
+                     ecol = which(colnames(brut) %in% mapping_dic$mapping),
                      peptideLength = peptide_length,
                      proteaseRegExp = getProtease("trypsin"),keep_original = FALSE,
                      log2_transformed = FALSE)

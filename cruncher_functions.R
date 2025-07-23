@@ -229,8 +229,8 @@ input_popup <- function (id, pars)
             condition = sprintf("input['%s']", ns("checkbox_diann")),
             actionButton(ns("run_diagui"), "  RUN DIA preparation ")
             ),
-	    br(),
-  	    conditionalPanel(
+	        br(),
+  	        conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
             verbatimTextOutput(ns("log_output"))
             ),
@@ -261,7 +261,7 @@ input_popup <- function (id, pars)
 
         shinyFileChoose(
         input = input,
-        id = "diannReportfile or dianProteinGroup file",
+        id = "diannReportfile",
         roots = rt,
         defaultRoot = names(rt)[1],
         session = session,
@@ -299,9 +299,6 @@ input_popup <- function (id, pars)
             as.character(file_info$datapath[1])
         })
 
-
-
-
         selected_diann_tsv <- reactive({
             req(input$diannReportfile)
             req(!inherits(input$diannReportfile, "integer"))
@@ -310,8 +307,6 @@ input_popup <- function (id, pars)
 	    log_content("diann report file uploaded")
             as.character(file_info$datapath[1])
         })
-
-
 
 
         selected_fasta_file <- reactive({
@@ -324,8 +319,6 @@ input_popup <- function (id, pars)
             function(x)normalizePath(as.character(x)))
         })
 
-
-
         log_content <- reactiveVal("inactive")
         output$log_output <- renderText({
             log_content()
@@ -335,18 +328,19 @@ input_popup <- function (id, pars)
         observeEvent(input$run_diagui, {
 
         req(selected_diann_tsv())  # your diann tsv file
-        req(selected_fasta_file())  # your diann tsv file
 	    req(selected_raw2expr())
 	    log_content('wait')
-	    mapping_df = read_mapping_raw2expr(selected_raw2expr())
 	    log_file = file.path(dirname(selected_diann_tsv()), 'dia_gui_log.txt')
 	    con <- file(log_file, open = "a")
 	    sink(con, type = 'output')            # redirect output
 	    sink(con, type = "message")  # redirect messages
+
+        if (input$method == 'psm') {
+        req(selected_fasta_file())  # your FASTA file(s)
+
 	    cat("DIA-NN GUI started at ", Sys.time(), "\n")
 	    cat("making FASTA  ", Sys.time(), "\n")
-	    mapping_csv <- read.csv(selected_raw2expr()) # reading experiment design mapping file
-
+        mapping_df = read_mapping_raw2expr(selected_raw2expr())
         fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
         clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
 	    
@@ -379,12 +373,28 @@ input_popup <- function (id, pars)
             dir.create(maxlfq_folder_path)
         }
 
-
         write.table(final_ibaq, file = file.path(ibaq_folder_path, 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
         write.table(final_maxlfq, file = file.path(maxlfq_folder_path, 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
-	    cat("DIA_GUI job finsised  ", Sys.time(), "\n")
+    	cat("DIA_GUI job finsised  ", Sys.time(), "\n")
 	    log_content("Finished DIA-GUI")
+        showNotification("File saved successfully!", duration = 8, type = "message")  
 
+        } else { # only mapping for the proteinGroup
+        cat('mappting raw file to experiment')
+
+        tryCatch({
+        file_path <- file.path(dirname(selected_diann_tsv()), 'mapped_proteinGroup.tsv')
+        final_df <- make_final_pg(selected_diann_tsv(), selected_raw2expr())
+        write.table(final_df, file = file_path, sep = "\t", row.names = FALSE, quote = FALSE)
+        showNotification("File saved successfully!", duration = 8, type = "message")  
+        cat("Mapping finished", Sys.time(), "\n")
+	    log_content("Finished mapping")
+        }, error = function(e) {
+        showNotification(paste("Error while saving file:", e$message), type = "error", duration = 8)
+        cat(e$message)
+        log_content(e$message)
+        })
+        }
   	    # End logging
   	    sink(type = "message")
  	    sink()
@@ -412,7 +422,6 @@ input_popup <- function (id, pars)
     })
 
 }
-
 
 
 
