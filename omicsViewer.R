@@ -149,7 +149,7 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
 
 
     
-    print(.dir())    
+      
     ll <- list.files(.dir(), pattern = filePattern, ignore.case = TRUE)
     updateSelectizeInput(session = session, inputId = "selectFile", 
                          choices = ll, selected = "")
@@ -243,29 +243,44 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     }
     
     ig <- imputeGetter(reactive_eset())
-    
+  
     withProgress(message = "Writing table", value = 0, {
       wb <- createWorkbook(creator = "BayBioMS")
       addWorksheet(wb, sheetName = "Phenotype info")
       addWorksheet(wb, sheetName = "Feature info")
       addWorksheet(wb, sheetName = "Expression")
       addWorksheet(wb, sheetName = "Geneset annot")
-      incProgress(1/5, detail = "expression matrix")
+      incProgress(1/6, detail = "expression matrix")
       writeData(wb, sheet = "Expression", td(expr()))
       if (!is.null(ig)) {
         addWorksheet(wb, sheetName = "Expression_imputed")
         writeData(wb, sheet = "Expression_imputed", td(ig))
       }
-      incProgress(1/5, detail = "feature table")
+      incProgress(1/6, detail = "feature table")
       writeData(wb, sheet = "Feature info", td(fdata()))
-      incProgress(1/5, detail = "phenotype table")
+      incProgress(1/6, detail = "phenotype table")
       writeData(wb, sheet = "Phenotype info", td(pdata()))
-      incProgress(1/5, detail = "writing geneset annotation")
-      writeData(wb, sheet = "Geneset annot", attr(fdata(), 
-                                                  "GS"))
-      incProgress(1/5, detail = "Saving table")
+      incProgress(1/6, detail = "writing geneset annotation")
+      writeData(wb, sheet = "Geneset annot", attr(fdata(), "GS"))
+
+      tryCatch({
+        print("trying to write the final excel file for download")
+        print(.dir())
+        
+        addWorksheet(wb, sheetName = "Raw_input")
+        incProgress(1/6, detail = "writing geneset input sheet")
+        
+        object_info <- readRDS(file.path(.dir(), "obj.RDS"))
+        writeData(wb, sheet = "Raw_input", obj$annot)
+        
+      }, error = function(e) {
+        message("⚠️ Error while gettting the raw data: ", e$message)
+      })
+      incProgress(1/6, detail = "Saving table")
       saveWorkbook(wb, file = file, overwrite = TRUE)
     })
+
+
   })
   output$summary <- renderUI({
     if (!vEset()) {
