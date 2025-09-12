@@ -25,6 +25,11 @@ cruncher_ui <- function (id, viewOnly = FALSE)
                 badgeLabel = "Pending", badgeColor = "purple"),
             menuItem("Results", tabName = ns("viewer"), icon = icon("map-marked-alt"),
                 badgeLabel = "Pending", badgeColor = "purple"),
+                actionButton(ns("reload_btn"), "Reload Page", icon = icon("redo")),
+                # and include script binding (use ns to compute id)
+                tags$head(tags$script(HTML(sprintf("
+                $(document).on('click', '#%s', function(){ location.reload(); });
+                ", ns("reload_btn"))))),
             uiOutput(ns("share.ui")))), dashboardBody(tabItems(tabItem(tabName = ns("loading"),
             module_input_ui(id = ns("input"), viewOnly = viewOnly)),
             tabItem(tabName = ns("normalization"), module_normalization_ui(ns("body_normalization"),
