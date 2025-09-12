@@ -3,7 +3,7 @@ source('cruncher_functions.R')
 cruncher_ui <- function (id, viewOnly = FALSE)
 {
     ns <- NS(id)
-    dashboardPage(dashboardHeader(title = "MQ Cruncher Test"),
+    dashboardPage(dashboardHeader(title = "MQ Cruncher NEW VERSION"),
         dashboardSidebar(useShinyjs(), sidebarMenu(id = ns("tabs"),
             menuItem("Data Loading", tabName = ns("loading"),
                 icon = icon("file-import"), badgeLabel = "Pending",

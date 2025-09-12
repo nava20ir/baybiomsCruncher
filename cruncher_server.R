@@ -244,8 +244,20 @@ cruncher_server <- function (id, ...)
                   label = "Submit"), size = "l", easyClose = TRUE,
                 fade = TRUE))
         })
+
+
         res <- reactiveVal(NULL)
+
         observeEvent(input$submit2, {
+            shinyjs::hide(selector = paste0("li a[data-value='", ns("loading"), "']"))
+            shinyjs::hide(selector = paste0("li a[data-value='", ns("stats"), "']"))
+            shinyjs::hide(selector = paste0("li a[data-value='", ns("normalization"), "']"))
+            shinyjs::hide(selector = paste0("li a[data-value='", ns("cortest"), "']"))
+            shinyjs::hide(selector = paste0("li a[data-value='", ns("steps"), "']"))
+            shinyjs::hide(selector = paste0("li a[data-value='", ns("annot"), "']"))
+            shinyjs::hide(selector = paste0("li a[data-value='", ns("misc"), "']"))
+            shinyjs::hide(selector = paste0("li a[data-value='", ns("ttest"), "']"))
+
             removeModal()
             show_modal_spinner()
             v3 <- mqCrunch(file = file.path(normalizePath(config$dataLoading$pathESVProject),
