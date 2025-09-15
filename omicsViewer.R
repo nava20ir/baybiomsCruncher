@@ -2777,12 +2777,37 @@ L1_data_space_module <- function (input, output, session, expr, pdata, fdata, re
     req(expr())
     if (ncol(expr()) <= 3) 
       return(NULL)
+
     if (is.null(cormat())) {
-      cc <- cor(expr(), use = "pairwise.complete.obs")
-      diag(cc) <- NA
-      hcl <- hclust(as.dist(1 - cor(t(cc), use = "pair")), 
-                    method = "ward.D")
+
+    new_expr = expr()
+    make_hclust <- function(new_expr){
+        # compute correlation matrix
+        cc <- cor(new_expr, use = "pairwise.complete.obs")
+        diag(cc) <- NA
+        # compute hierarchical clustering
+        finalhcl <- hclust(as.dist(1 - cor(t(cc), use = "pair")), method = "ward.D")
+        return(list(finalhcl=finalhcl,cc=cc))
+
+    }
+
+      finalhcl <- tryCatch({
+        return(make_hclust(new_expr))
+      }, warning = function(e) {
+        message("Error in correlation or clustering: ", e$message)
+        new_expr[is.na(new_expr)] = 0
+        return(make_hclust(new_expr))
+
+      },  error = function(e) {
+        message("Error in correlation or clustering: ", e$message)
+        new_expr[is.na(new_expr)] = 0
+        return(make_hclust(new_expr))
+      })
+      hcl = finalhcl$finalhcl
+      cc = finalhcl$cc
+
       dend <- as.dendrogram(hcl)
+      
       dl <- list(pearson_ward.D = list(ord = hcl$order, 
                                        hcl = dend))
       attr(cc, "rowDendrogram") <- dl
