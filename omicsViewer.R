@@ -2791,18 +2791,29 @@ L1_data_space_module <- function (input, output, session, expr, pdata, fdata, re
 
     }
 
-      finalhcl <- tryCatch({
-        return(make_hclust(new_expr))
-      }, warning = function(e) {
-        message("Error in correlation or clustering: ", e$message)
-        new_expr[is.na(new_expr)] = 0
-        return(make_hclust(new_expr))
-
-      },  error = function(e) {
-        message("Error in correlation or clustering: ", e$message)
-        new_expr[is.na(new_expr)] = 0
-        return(make_hclust(new_expr))
+      finalhcl <- tryCatch(
+      {
+        make_hclust(new_expr)   # your function
+      },
+      error = function(e) {
+        message("❌ Error in make_hclust: ", e$message)
+        return(NULL)            # fallback value
       })
+
+      if (is.null(finalhcl)){
+      finalhcl <- tryCatch(
+      {
+        new_expr[is.na(new_expr)] = 0
+        make_hclust(new_expr)   # your function
+      },
+      error = function(e) {
+        message("❌ Error in make_hclust: ", e$message)
+        return(NULL)            # fallback value
+      })
+      }
+
+
+
       hcl = finalhcl$finalhcl
       cc = finalhcl$cc
 
