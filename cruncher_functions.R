@@ -4,9 +4,7 @@ source('run_DIA_gui.R') # to calculte maxLFQ using iq and iBAQ with DIA-GUI pack
 source('map2expr.R') # for mapping raw files to experiment names
 
 
-
-pars <- yaml::read_yaml("/home/asakhteman/mqcruncher/mqcrunchadmin/lims.yaml")
-
+pars <- yaml::read_yaml("/home/shiny/app/lims.yaml")
 c2n <- function (x)
 {
     v <- as.numeric(as.character(x))
