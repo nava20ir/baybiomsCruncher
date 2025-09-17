@@ -5,7 +5,7 @@ source('map2expr.R') # for mapping raw files to experiment names
 
 
 
-pars <- yaml::read_yaml("/home/shiny/app/lims.yaml")
+pars <- yaml::read_yaml("/home/asakhteman/mqcruncher/mqcrunchadmin/lims.yaml")
 
 c2n <- function (x)
 {
@@ -85,9 +85,8 @@ getQCStats <- function (x, method='custom')
         0)
     nvalInt <- colSums(!is.na(rowCumsums(x)))
     expr0 <- x
-    #print(class(x))
-    #print(dim(x))
-    # expr0 <- fillNA(x,method=method)  # chen is using different strategies in PCA plot and in t-test
+
+
     if ((method == 'custom') | (method == 'chen-meng')) {
      print('Using the arbitrary method from Chen-meng')
      expr0[is.na(expr0)] <- min(expr0, na.rm = TRUE) - log10(2)
@@ -96,8 +95,8 @@ getQCStats <- function (x, method='custom')
      expr0 <- impute_perseus(x)
      }
     
-    #print(dim(expr0))
-    #print(any(is.na(expr0)))
+
+
     if (ncol(x) <= 2) {
         r1 <- r2 <- NULL
     }
@@ -607,6 +606,19 @@ module_annot <- function (id, obj, annot_dir, config)
             req(upids())
             actionButton(ns("procUPID"), label = "Process")
         })
+
+
+        observeEvent(input$updateAnnots,{
+            
+                af <- list.files(annot_dir, pattern = "annot$")
+                names(af) <- sub(".annot$", "", af)
+                af <- c(none = "", af)
+                updateSelectInput(session, inputId = "annotdb", choices = af)
+                showNotification('Updated')
+
+        })
+   
+
         observeEvent(input$procUPID, {
             show_modal_spinner(text = "Downloading reference proteome ... ")
             upf <- downloadUPRefProteome(id = input$refup, domain = input$domain,
@@ -674,14 +686,17 @@ module_annot_ui <- function (id, annot_dir, viewOnly = FALSE)
     }
     else tl <- absolutePanel(top = 5, right = 20, actionButton(inputId = ns("save"),
         "Save configuration"), style = "z-index: 1111;")
-    tagList(absolutePanel(top = -10, left = 275, tags$h2("Protein annotation"),
-        style = "z-index: 1111;"), tl, fluidRow(column(6, wellPanel(style = "background: white; height: 800px",
+        tagList(absolutePanel(top = -10, left = 275, tags$h2("Protein annotation"),
+        style = "z-index: 1111;"), tl,
+        fluidRow(column(6, wellPanel(style = "background: white; height: 800px",
         tags$h3("Annotation database"), uiOutput(ns("fasta_ui")),
         tabsetPanel(id = ns("gsTabset"), tabPanel("Functional annotation",
             fluidRow(column(8, selectInput(ns("annotdb"), label = "Select annotation database",
                 choices = af, multiple = FALSE, selected = "")),
                 column(4, selectInput(ns("amatchcol"), label = "ID column",
                   choices = "", multiple = FALSE, selected = ""))),
+            fluidRow(column(8,actionButton(ns("updateAnnots"), "Update annotation database"))),
+            fluidRow(),
             tags$b("Selected annotation database:"), tabsetPanel(tabPanel("Database",
                 uiOutput(ns("annotSelected"))), tabPanel("Sources",
                 multiInput(inputId = ns("adbs"), label = "Select annotation source:",
@@ -705,6 +720,7 @@ module_annot_ui <- function (id, annot_dir, viewOnly = FALSE)
             column(4, selectInput(ns("isosep"), label = "Isoform separator",
                 choices = c("none", "dot (.)", "dash (-)"), selected = "none"))),
         DT::dataTableOutput(ns("fdata_tab"))))))
+        
 }
 
 
@@ -842,6 +858,8 @@ module_input <- function (id, dir, config)
                 "A 'proteinGroups.txt' file cannot be find in this folder!"))
         })
         dat <- reactiveVal()
+
+
         observe({
             req(mqpar()$valid)
             req(mqpar()$method %in% c("LF", "TMT"))
@@ -908,11 +926,16 @@ module_input <- function (id, dir, config)
                 return(NULL)
             updateMultiInput(session, inputId = "exprsCol", selected = "")
         })
+
+
+  
         observeEvent(input$exprsColDone, {
             if (!is.null(datReload()))
                 return(NULL)
             removeModal()
             tab <- read.delim(mqpar()$filePath, stringsAsFactors = FALSE)
+
+
             expr <- apply(tab[, input$exprsCol, drop = FALSE],
                 2, log10)
             expr[is.infinite(expr)] <- NA
@@ -922,6 +945,8 @@ module_input <- function (id, dir, config)
             attr(d, "label") <- input$exprsCol
             dat(d)
         })
+
+       
         pdata <- reactiveVal()
         observeEvent(dat(), {
             if (!is.null(datReload()))
