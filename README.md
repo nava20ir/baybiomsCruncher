@@ -24,4 +24,12 @@ sh deploy_as_container.sh
 sudo docker ps
 ```
 
+## to register the image in the dockerHub
+```
+docker login
+docker tag mqctest:latest nava20ir/mqctest:latest
+docker push nava20ir/mqctest:latest
+
+```
+
 
