@@ -16,6 +16,7 @@ s1 <- c(
   "psych",
   "stringr",
   "shiny",
+  "rhandsontable",
   "shinydashboard",
   "shinyWidgets",
   "shinybusy",

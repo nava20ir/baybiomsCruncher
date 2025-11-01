@@ -170,10 +170,34 @@ getUPRefProteomeID <- function (domain = c("Eukaryota", "Archaea", "Bacteria", "
 input_popup <- function (id, pars)
 {
     moduleServer(id, function(input, output, session) {
+        library(rhandsontable)
+        library(shinyFiles)
         ns <- session$ns
         rt <- structure(normalizePath(unlist(pars$project_dir)),
-            names = names(pars$project_dir))
+        names = names(pars$project_dir))
         # show modal for the input files DIA
+
+
+        # Example data for Excel-like component
+        table_data <- reactiveVal(data.frame(
+        info = c("A", "B", "C"),
+        mapping = c("Control", "Treated", "Treated"),
+        name = c(1, 1, 2)
+        ))
+
+        # Render the table inside the modal
+        output$excel_table <- renderRHandsontable({
+        rhandsontable(table_data(), rowHeaders = NULL)
+        })
+
+        # Capture edits from the user
+        observe({
+        if (!is.null(input$excel_table)) {
+            table_data(hot_to_r(input$excel_table))
+        }
+        })
+
+
         showModal(
         modalDialog(
             checkboxInput(ns("checkbox_diann"), "DIA-NN work flow", value = FALSE),
@@ -187,6 +211,14 @@ input_popup <- function (id, pars)
                 selected = "pg"
             )
             ),
+            br(),
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
+            # --- New Excel-like Table ---
+            tags$h4("make mapping file between experiment and raw-files"),
+            rHandsontableOutput(ns("excel_table")),
+            br(),
+            actionButton(ns("save_table"), "Save Mapping table between raw-file and experiments")),
             br(),
 	        conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
@@ -238,6 +270,7 @@ input_popup <- function (id, pars)
             multiple = FALSE
             ),
 
+
             title = "Loading project ...",
             footer = tagList(modalButton("Cancel")),
             size = "m",
@@ -285,7 +318,12 @@ input_popup <- function (id, pars)
         restrictions = c("AnnotDB", "R-Portable-viewer")
         )
 
-       
+    observeEvent(input$save_table, {
+      cat("Updated table:\n")
+      print(table_data())
+    })
+  
+
 
         selected_raw2expr <- reactive({
             req(input$mappingFile)
