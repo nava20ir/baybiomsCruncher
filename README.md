@@ -18,7 +18,12 @@ sudo docker build . -t mqctest
 ```
 sh deploy_as_container.sh
 ```
+or
 
+```
+docker-compose up -d --build
+
+```
 ## to test if the container is up and running
 ```
 sudo docker ps

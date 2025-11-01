@@ -1,0 +1,20 @@
+version: "3.6"
+
+services:
+  mqctest:
+    build: .
+    container_name: cruncheradmin
+    restart: unless-stopped
+    ports:
+      - "5930:3839"
+    volumes:
+      - /media/shiny_baybioms/Projects/002_proteomics/:/home/shiny/projects_baybioms
+      - /media/shiny_baybioms/Projects/008_Bioinformatics/:/home/shiny/projects_bioinformatics
+      - /media/LIMS/AnnotDB/:/home/shiny/annotDb
+      - /media/share_project/Projects_Munich/009_BayBioMSMRI_Proteomics:/home/shiny/projects_baybioms_mri
+      - /media/LIMS/HashTable/Proteomics/:/home/shiny/hashtab
+      - /media/Biotyping/P110:/home/shiny/projects_biotyping
+      - /home/asakhteman/mqcrunch/mqcrunchadmin/log:/var/log/shiny-server/
+    tty: true
+    stdin_open: true
+
