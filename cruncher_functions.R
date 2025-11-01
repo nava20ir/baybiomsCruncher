@@ -167,6 +167,7 @@ getUPRefProteomeID <- function (domain = c("Eukaryota", "Archaea", "Bacteria", "
 }
 
 
+
 input_popup <- function (id, pars)
 {
     moduleServer(id, function(input, output, session) {
@@ -180,9 +181,8 @@ input_popup <- function (id, pars)
 
         # Example data for Excel-like component
         table_data <- reactiveVal(data.frame(
-        info = c("A", "B", "C"),
-        mapping = c("Control", "Treated", "Treated"),
-        name = c(1, 1, 2)
+        mapping = c("Control", "Treated1", "Treated2"),
+        name = c('rawfile_1.raw', 'rawfile2.raw', 'rawfile3.raw')
         ))
 
         # Render the table inside the modal
@@ -217,18 +217,19 @@ input_popup <- function (id, pars)
             # --- New Excel-like Table ---
             tags$h4("make mapping file between experiment and raw-files"),
             rHandsontableOutput(ns("excel_table")),
-            br(),
-            actionButton(ns("save_table"), "Save Mapping table between raw-file and experiments")),
-            br(),
-	        conditionalPanel(
-            condition = sprintf("input['%s']", ns("checkbox_diann")),
-            shinyFilesButton(
-            id = ns("mappingFile"),
-            label = "Select mapping csv file between RAW and experiments",
-            title = "experiment CSV file",
-            multiple = FALSE
-            )
+            #br(),
+            #actionButton(ns("save_table"), "Save Mapping table between raw-file and experiments")
             ),
+            #br(),
+	        #conditionalPanel(
+            #condition = sprintf("input['%s']", ns("checkbox_diann")),
+            #shinyFilesButton(
+            #id = ns("mappingFile"),
+            #label = "Select mapping csv file between RAW and experiments",
+            #title = "experiment CSV file",
+            #multiple = FALSE
+            #)
+            #),
 	        br(),
             conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
@@ -279,15 +280,15 @@ input_popup <- function (id, pars)
             )
             )
 
-        shinyFileChoose(
-        input = input,
-        id = "mappingFile",
-        roots = rt,
-        defaultRoot = names(rt)[1],
-        session = session,
-        filetypes = c("", "csv"),
-        restrictions = c("AnnotDB", "R-Portable-viewer")
-        )
+        #shinyFileChoose(
+        #input = input,
+        #id = "mappingFile",
+        #roots = rt,
+        #defaultRoot = names(rt)[1],
+        #session = session,
+        #filetypes = c("", "csv"),
+        #restrictions = c("AnnotDB", "R-Portable-viewer")
+        #)
 
         shinyFileChoose(
         input = input,
@@ -318,12 +319,20 @@ input_popup <- function (id, pars)
         restrictions = c("AnnotDB", "R-Portable-viewer")
         )
 
-    observeEvent(input$save_table, {
-      cat("Updated table:\n")
-      print(table_data())
-    })
+        #observeEvent(input$save_table, {
+        #cat("Updated table:\n")
+        #print(table_data())
+        #})
   
-
+        # Add download handler — triggers file save dialog
+        #output$download_table <- downloadHandler(
+        #    filename = function() {
+        #    paste0("my_table_", Sys.Date(), ".csv")
+        #    },
+        #    content = function(file) {
+        #    write.csv(table_data(), file, row.names = FALSE)
+        #    }
+        #)
 
         selected_raw2expr <- reactive({
             req(input$mappingFile)
@@ -363,7 +372,10 @@ input_popup <- function (id, pars)
         observeEvent(input$run_diagui, {
 
         req(selected_diann_tsv())  # your diann tsv file
-	    req(selected_raw2expr())
+	    #req(selected_raw2expr())
+        req(table_data())
+        #cat(table_data())
+        print(table_data())
 	    log_content('wait')
 	    log_file = file.path(dirname(selected_diann_tsv()), 'dia_gui_log.txt')
 	    con <- file(log_file, open = "a")
@@ -375,7 +387,9 @@ input_popup <- function (id, pars)
 
 	    cat("DIA-NN GUI started at ", Sys.time(), "\n")
 	    cat("making FASTA  ", Sys.time(), "\n")
-        mapping_df = read_mapping_raw2expr(selected_raw2expr())
+        #mapping_df = read_mapping_raw2expr(selected_raw2expr())
+        mapping_df = table_data()
+
         fasta_combined <- unlist(lapply(selected_fasta_file(), readLines))
         clean_lines <- fasta_combined[nzchar(trimws(fasta_combined))]
 	    
@@ -419,7 +433,10 @@ input_popup <- function (id, pars)
 
         tryCatch({
         file_path <- file.path(dirname(selected_diann_tsv()), 'mapped_proteinGroup.tsv')
-        final_df <- make_final_pg(selected_diann_tsv(), selected_raw2expr())
+
+        #final_df <- make_final_pg(selected_diann_tsv(), selected_raw2expr())
+        final_df <- make_final_pg(selected_diann_tsv(), table_data())
+
         write.table(final_df, file = file_path, sep = "\t", row.names = FALSE, quote = FALSE)
         showNotification("File saved successfully!", duration = 8, type = "message")  
         cat("Mapping finished", Sys.time(), "\n")
@@ -457,7 +474,6 @@ input_popup <- function (id, pars)
     })
 
 }
-
 
 
 landingPage_module <- function (id, codeTable)
