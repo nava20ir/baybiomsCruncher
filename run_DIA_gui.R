@@ -1,10 +1,10 @@
 library(DIAgui)
 
 
-make_final_pg <- function(dian_tsv_path,mapping_csv_path)
+make_final_pg <- function(dian_tsv_path,mapping_csv)
 {
 df <- as.data.frame(data.table::fread(dian_tsv_path, stringsAsFactors = FALSE))
-mapping_csv = read.csv(mapping_csv_path,stringsAsFactors = F)
+#mapping_csv = read.csv(mapping_csv_path,stringsAsFactors = F)
 
 mapcolname2exp <- function(x,mapping_csv){
   if (x %in% mapping_csv$name) {

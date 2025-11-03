@@ -233,6 +233,12 @@ input_popup <- function (id, pars)
 	        br(),
             conditionalPanel(
             condition = sprintf("input['%s']", ns("checkbox_diann")),
+            checkboxInput(ns("remove_CON"), "Remove contaminats from the output", value = TRUE)
+            ),
+
+	        br(),
+            conditionalPanel(
+            condition = sprintf("input['%s']", ns("checkbox_diann")),
             shinyFilesButton(
             id = ns("diannReportfile"),
             label = "Select diann input",
@@ -422,6 +428,12 @@ input_popup <- function (id, pars)
             dir.create(maxlfq_folder_path)
         }
 
+        # remove the contaminant if the check box is clicked
+        if (input$remove_CON){
+            final_ibaq <- final_ibaq[!grepl(final_ibaq[['Protein.Group']],pattern = 'CON_'),]
+            final_maxlfq <- final_maxlfq[!grepl(final_maxlfq[['Protein.Group']],pattern = 'CON_'),]
+        }
+
         write.table(final_ibaq, file = file.path(ibaq_folder_path, 'ibaq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
         write.table(final_maxlfq, file = file.path(maxlfq_folder_path, 'maxlfq.tsv'), sep = "\t", row.names = FALSE, quote = FALSE)
     	cat("DIA_GUI job finsised  ", Sys.time(), "\n")
@@ -429,13 +441,19 @@ input_popup <- function (id, pars)
         showNotification("File saved successfully!", duration = 8, type = "message")  
 
         } else { # only mapping for the proteinGroup
-        cat('mappting raw file to experiment')
+        cat('mapping raw file to experiment')
 
         tryCatch({
         file_path <- file.path(dirname(selected_diann_tsv()), 'mapped_proteinGroup.tsv')
-
+        cat(file_path)
         #final_df <- make_final_pg(selected_diann_tsv(), selected_raw2expr())
         final_df <- make_final_pg(selected_diann_tsv(), table_data())
+
+        # to remove the contaminants if checkbox is clicked
+        
+        if (input$remove_CON){
+            final_df <- final_df[!grepl(final_df[['Protein.Group']],pattern = 'CON_'),]
+        }
 
         write.table(final_df, file = file_path, sep = "\t", row.names = FALSE, quote = FALSE)
         showNotification("File saved successfully!", duration = 8, type = "message")  
@@ -474,7 +492,6 @@ input_popup <- function (id, pars)
     })
 
 }
-
 
 landingPage_module <- function (id, codeTable)
 {
