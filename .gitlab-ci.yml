@@ -16,9 +16,9 @@ build_images:
     - docker:dind
   script:
     - echo "Building Docker image..."
-    - docker build . -t "gitlab.lrz.de:5005/baybioms1/proteomics/cruncher/mqcrunchadmin:latest"
+    - docker build . -t "$CI_REGISTRY_IMAGE:latest"
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker push "gitlab.lrz.de:5005/baybioms1/proteomics/cruncher/mqcrunchadmin:latest"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
 
   only:
     - main
@@ -46,7 +46,7 @@ deploy:
     - ssh asakhteman@$SSH_DEPLOY_HOST "
         cd $COMPOSE_PATH &&
         echo '$CI_REGISTRY_PASSWORD' | docker login -u '$CI_REGISTRY_USER' --password-stdin '$CI_REGISTRY' &&
-        docker pull $CI_REGISTRY_IMAGE:latest &&
+        docker pull "$CI_REGISTRY_IMAGE:latest" &&
         docker rm -f \$(docker ps -q --filter 'publish=5930') || true &&
         sh deploy_as_container.sh
       "
