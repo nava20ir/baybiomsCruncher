@@ -243,41 +243,60 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     }
     
     ig <- imputeGetter(reactive_eset())
-  
     withProgress(message = "Writing table", value = 0, {
-      wb <- createWorkbook(creator = "BayBioMS")
-      addWorksheet(wb, sheetName = "Phenotype info")
-      addWorksheet(wb, sheetName = "Feature info")
-      addWorksheet(wb, sheetName = "Expression")
-      addWorksheet(wb, sheetName = "Geneset annot")
-      incProgress(1/6, detail = "expression matrix")
-      writeData(wb, sheet = "Expression", td(expr()))
-      if (!is.null(ig)) {
-        addWorksheet(wb, sheetName = "Expression_imputed")
-        writeData(wb, sheet = "Expression_imputed", td(ig))
-      }
-      incProgress(1/6, detail = "feature table")
-      writeData(wb, sheet = "Feature info", td(fdata()))
-      incProgress(1/6, detail = "phenotype table")
-      writeData(wb, sheet = "Phenotype info", td(pdata()))
-      incProgress(1/6, detail = "writing geneset annotation")
-      writeData(wb, sheet = "Geneset annot", attr(fdata(), "GS"))
+   
 
+      wb <- createWorkbook(creator = "BayBioMS")
+      feature_info <- td(fdata())
+      meta_cols <- feature_info[,grepl(x=colnames(feature_info),pattern='General')]
+
+
+
+      # expression data
+      addWorksheet(wb, sheetName = "log10_Expression")
+      incProgress(1/6, detail = "expression matrix")
+      writeData(wb, sheet = "log10_Expression", cbind(meta_cols,td(expr())))
+
+      # imputed data
+      if (!is.null(ig)) {
+        addWorksheet(wb, sheetName = "log10_Expression_imputed")
+        writeData(wb, sheet = "log10_Expression_imputed", cbind(meta_cols,td(ig)))
+      }
+      
+      # adding raw data; we retrieve them from the RDS object
       tryCatch({
-        print("trying to write the final excel file for download")
-        print(.dir())
-        
         addWorksheet(wb, sheetName = "Raw_input")
         incProgress(1/6, detail = "writing geneset input sheet")
-        
         object_info <- readRDS(file.path(.dir(), "obj.RDS"))
-        writeData(wb, sheet = "Raw_input", object_info$annot)
+        raw_exprs <- 10 ^ object_info$exprs
+        writeData(wb, sheet = "Raw_input", cbind(object_info$annot,raw_exprs))
         
       }, error = function(e) {
         message("⚠️ Error while gettting the raw data: ", e$message)
       })
+
+      # t-test results
+      addWorksheet(wb, sheetName = "Differential_t_test")
+      incProgress(1/6, detail = "Differential expression analysis")
+      feature_info <- feature_info[,grepl(colnames(feature_info),pattern='General|ttest')]
+
+      writeData(wb, sheet = "Differential_t_test", feature_info)
+
+      # adding meta data
+      addWorksheet(wb, sheetName = "Phenotype_info")
+      incProgress(1/6, detail = "feature table")
+      writeData(wb, sheet = "Phenotype_info", td(pdata()))
+
+      # adding gene-set annot
+      addWorksheet(wb, sheetName = "Geneset_annot")   
+      incProgress(1/6, detail = "writing geneset annotation")
+      writeData(wb, sheet = "Geneset_annot", attr(fdata(), "GS"))
+
+      # saving the excel table
       incProgress(1/6, detail = "Saving table")
       saveWorkbook(wb, file = file, overwrite = TRUE)
+ 
+
     })
 
 
