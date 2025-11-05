@@ -18,8 +18,8 @@ build_images:
     - echo "Building Docker image..."
     - docker build . -t "gitlab.lrz.de:5005/baybioms1/proteomics/cruncher/mqcrunchadmin:latest"
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker push "$CI_REGISTRY_IMAGE:latest"
-    - docker images
+    - docker push "gitlab.lrz.de:5005/baybioms1/proteomics/cruncher/mqcrunchadmin:latest"
+
   only:
     - main
   tags:
