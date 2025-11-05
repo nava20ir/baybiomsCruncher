@@ -264,15 +264,17 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       }
       
       # adding raw data; we retrieve them from the RDS object
+      addWorksheet(wb, sheetName = "Raw_input")
+      incProgress(1/6, detail = "writing geneset input sheet")
+      object_info <- readRDS(file.path(.dir(), "obj.RDS"))
       tryCatch({
-        addWorksheet(wb, sheetName = "Raw_input")
-        incProgress(1/6, detail = "writing geneset input sheet")
-        object_info <- readRDS(file.path(.dir(), "obj.RDS"))
+
         raw_exprs <- 10 ^ object_info$exprs
         writeData(wb, sheet = "Raw_input", cbind(object_info$annot,raw_exprs))
         
       }, error = function(e) {
         message("⚠️ Error while gettting the raw data: ", e$message)
+        writeData(wb, sheet = "Raw_input", object_info$annot)
       })
 
       # t-test results
