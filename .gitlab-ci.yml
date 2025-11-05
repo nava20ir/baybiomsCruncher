@@ -1,0 +1,56 @@
+
+stages:
+  - build
+  - deploy
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_BUILDKIT: 0
+# ---------------------------
+# 1. Build Docker images
+# ---------------------------
+build_images:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Building Docker image..."
+    - docker build . -t "gitlab.lrz.de:5005/baybioms1/proteomics/cruncher/mqcrunchadmin:latest"
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+    - docker images
+  only:
+    - main
+  tags:
+    - baybioms
+# ---------------------------
+# 2. Deploy via SSH
+# ---------------------------
+deploy:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H "$SSH_DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+  script:
+    - echo "Deploying to $SSH_DEPLOY_HOST..."
+    - COMPOSE_PATH=/home/asakhteman/$CI_PROJECT_NAME/$CI_COMMIT_REF_SLUG/
+    - ssh asakhteman@$SSH_DEPLOY_HOST "mkdir -p $COMPOSE_PATH"
+    - scp  Dockerfile lims.yaml deploy_as_container.sh asakhteman@$SSH_DEPLOY_HOST:$COMPOSE_PATH
+
+    # Deploy the prebuilt image
+    - ssh asakhteman@$SSH_DEPLOY_HOST "
+        cd $COMPOSE_PATH &&
+        echo '$CI_REGISTRY_PASSWORD' | docker login -u '$CI_REGISTRY_USER' --password-stdin '$CI_REGISTRY' &&
+        docker pull $CI_REGISTRY_IMAGE:latest &&
+        docker rm -f \$(docker ps -q --filter 'publish=5930') || true &&
+        sh deploy_as_container.sh
+      "
+  only:
+    - main
+  tags:
+    - baybioms
