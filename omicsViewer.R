@@ -226,7 +226,16 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     attr(eset, "cormat")
   })
   output$download <- downloadHandler(filename = function() {
-    paste0("ExpressenSet", Sys.time(), ".xlsx")
+    # changing the final excel file
+    id <- ''
+    try({
+    pathtocheck = .dir()
+    splitted_path = unlist(strsplit(pathtocheck,'/'))
+    length_path = length(splitted_path)
+    id <- splitted_path[length_path - 1]
+    })
+    paste0("Result_", Sys.time(), '_' , id ,".xlsx")
+
   }, content = function(file) {
     td <- function(tab) {
       ic <- which(vapply(tab, is.list, logical(1)))
@@ -242,60 +251,87 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       data.frame(ID = id, tab)
     }
     
+
+
     ig <- imputeGetter(reactive_eset())
     withProgress(message = "Writing table", value = 0, {
    
 
       wb <- createWorkbook(creator = "BayBioMS")
       feature_info <- td(fdata())
-      meta_cols <- feature_info[,grepl(x=colnames(feature_info),pattern='General')]
-
-
-
-      # expression data
-      addWorksheet(wb, sheetName = "log10_Expression")
-      incProgress(1/6, detail = "expression matrix")
-      writeData(wb, sheet = "log10_Expression", cbind(meta_cols,td(expr())))
+      meta_cols <- feature_info[,grepl(x=colnames(feature_info),pattern='General|ID')]
 
       # imputed data
       if (!is.null(ig)) {
-        addWorksheet(wb, sheetName = "log10_Expression_imputed")
-        writeData(wb, sheet = "log10_Expression_imputed", cbind(meta_cols,td(ig)))
+        addWorksheet(wb, sheetName = "log10_protein_intensity_imputed")
+        writeData(wb, sheet = "log10_protein_intensity_imputed", cbind(meta_cols,td(ig)))
       }
-      
+
+      # expression data
+      addWorksheet(wb, sheetName = "log10_protein_intensity")
+      incProgress(1/6, detail = "expression matrix")
+      writeData(wb, sheet = "log10_protein_intensity", cbind(meta_cols,td(expr())))
+
+
       # adding raw data; we retrieve them from the RDS object
-      addWorksheet(wb, sheetName = "Raw_input")
+      addWorksheet(wb, sheetName = "Raw_data")
       incProgress(1/6, detail = "writing geneset input sheet")
       object_info <- readRDS(file.path(.dir(), "obj.RDS"))
+      
       tryCatch({
-
         raw_exprs <- 10 ^ object_info$exprs
-        writeData(wb, sheet = "Raw_input", cbind(object_info$annot,raw_exprs))
-        
+        writeData(wb, sheet = "Raw_data", cbind(object_info$annot,raw_exprs))
       }, error = function(e) {
-        message("⚠️ Error while gettting the raw data: ", e$message)
-        writeData(wb, sheet = "Raw_input", object_info$annot)
+        message("⚠️ Error while gettting the raw data as first attempt: ", e$message)
+        writeData(wb, sheet = "Raw_data", object_info$annot)
       })
 
       # t-test results
       addWorksheet(wb, sheetName = "Differential_t_test")
       incProgress(1/6, detail = "Differential expression analysis")
       feature_info <- feature_info[,grepl(colnames(feature_info),pattern='General|ttest')]
+      feature_info = feature_info [,grepl(x = colnames(feature_info), pattern = "General|log.fdr|log.pvalue|.mean")]
+      colnames(feature_info) <- gsub(x=colnames(feature_info),pattern = 'fdr',replacement = 'BH_adjusted_pvalue')
+      colnames(feature_info) <- gsub(x=colnames(feature_info),pattern = '.log.',replacement = '.log10.')
+      colnames(feature_info) <- gsub(x=colnames(feature_info),pattern = 'mean',replacement = 'log10_fold_change')
 
+      ## the idea is to re-order the columns with mean first and then fdr and then pvalue for now we skip it this way 
+      #cols <- colnames(df)
+      #iter_num <- as.numeric(sub(".*?(\\d+).*", "\\1", cols))
+      #feature_order <- ifelse(grepl("mean", cols), 1,
+      #                        ifelse(grepl("pvalue", cols), 2,
+      #                               ifelse(grepl("fdr", cols), 3, NA)))
+      #new_order <- order(iter_num, feature_order)
+      #df <- df[, new_order]
       writeData(wb, sheet = "Differential_t_test", feature_info)
 
       # adding meta data
-      addWorksheet(wb, sheetName = "Phenotype_info")
-      incProgress(1/6, detail = "feature table")
-      writeData(wb, sheet = "Phenotype_info", td(pdata()))
+      addWorksheet(wb, sheetName = "sample_description")
+      incProgress(1/6, detail = "Sample description table")
+      meta_df <- td(pdata())
+      pca_df <-  meta_df 
+      pca_df <- pca_df[, !grepl(x = colnames(pca_df), pattern = "All.PC[4-9]")]
+      meta_df <- meta_df[, !grepl(x=colnames(meta_df),pattern='^PCA')]
+      writeData(wb, sheet = "sample_description", meta_df)
+      # adding PCA table
+      addWorksheet(wb, sheetName = "Principal_component_analysis")
+      writeData(wb, sheet = "Principal_component_analysis", pca_df)      
+
 
       # adding gene-set annot
-      addWorksheet(wb, sheetName = "Geneset_annot")   
+      gene_set_annot_df = attr(fdata(), "GS")
+      # to merge the gene set annot with the information about the 
+
+      try ({
+        gene_set_annot_df <- merge(gene_set_annot_df,meta_cols,by.x = 'featureId', by.y = 'ID' )
+      })
+
+      addWorksheet(wb, sheetName = "Geneset_annotation")   
       incProgress(1/6, detail = "writing geneset annotation")
-      writeData(wb, sheet = "Geneset_annot", attr(fdata(), "GS"))
+      writeData(wb, sheet = "Geneset_annotation", gene_set_annot_df)
 
       # saving the excel table
-      incProgress(1/6, detail = "Saving table")
+      incProgress(1/6, detail = "Saving Result_table")
       saveWorkbook(wb, file = file, overwrite = TRUE)
  
 
