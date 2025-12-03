@@ -1028,9 +1028,9 @@ module_input <- function (id, dir, config)
         output$tab <- renderExcel({
             req(pdata())
             excelTable(data = pdata(), columns = data.frame(type = excelR:::get_col_types(pdata())),
-                allowDeleteRow = FALSE, allowInsertRow = FALSE,
+                allowDeleteRow = FALSE, allowInsertRow = FALSE, rowHeaders = NULL,allowCut = FALSE,allowDeleteColumn = FALSE,
                 columnSorting = FALSE, colHeaders = colnames(pdata()),
-                tableHeight = "540px")
+                tableHeight = "700px")
         })
         e2r <- function(x, alt) {
             if (!is.null(x))
@@ -1158,6 +1158,7 @@ module_input_ui <- function (id, viewOnly = FALSE)
         label = NULL, placeholder = "Upload self-defined phenotype file",
         multiple = FALSE, accept = c(".csv", ".tsv",
         "xlsx", "txt"))), column(12, div(style = "overflow-x: scroll;",
+    tags$h2("** Do not re-order  the samples in the bellow table! **"),
     excelOutput(ns("tab"))))))), tabPanel("Exclude samples",
     wellPanel(style = "background: white; border-color: white;",
     multiInput(inputId = ns("exclude"), label = "Select samples to exclude",
