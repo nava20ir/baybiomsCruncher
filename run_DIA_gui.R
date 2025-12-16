@@ -140,8 +140,15 @@ baybioms_report_process <- function(data, header.id = "Protein.Group",
                      log2_transformed = FALSE)
     
   colnames(brut) <- gsub(colnames(brut),pattern='iBAQ_',replacement='')
-  brut <- brut[,c(setdiff(colnames(brut),mapping_dic$mapping),mapping_dic$mapping)]
-  iq_report <- iq_report[,c(setdiff(colnames(iq_report),mapping_dic$mapping),mapping_dic$mapping)]
+
+  try({
+      brut <- brut[,c(setdiff(colnames(brut),mapping_dic$mapping),mapping_dic$mapping)]
+    })
+    
+  try({
+      iq_report <- iq_report[,c(setdiff(colnames(iq_report),mapping_dic$mapping),mapping_dic$mapping)]
+    })
+
   return(list('ibaq'=brut,'max_lfq'=iq_report))
 }
 
