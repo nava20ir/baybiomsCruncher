@@ -1028,7 +1028,7 @@ module_input <- function (id, dir, config)
         output$tab <- renderExcel({
             req(pdata())
             excelTable(data = pdata(), columns = data.frame(type = excelR:::get_col_types(pdata())),
-                allowDeleteRow = FALSE, allowInsertRow = FALSE, rowHeaders = NULL,allowCut = FALSE,allowDeleteColumn = FALSE,
+                allowDeleteRow = FALSE, allowInsertRow = FALSE, rowHeaders = NULL,allowCut = FALSE,allowDeleteColumn = TRUE,
                 columnSorting = FALSE, colHeaders = colnames(pdata()),
                 tableHeight = "700px")
         })
