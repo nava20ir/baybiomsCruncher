@@ -1028,7 +1028,7 @@ module_input <- function (id, dir, config)
         output$tab <- renderExcel({
             req(pdata())
             excelTable(data = pdata(), columns = data.frame(type = excelR:::get_col_types(pdata())),
-                allowDeleteRow = FALSE, allowInsertRow = FALSE, rowHeaders = NULL,allowCut = FALSE,allowDeleteColumn = TRUE,
+                allowDeleteRow = FALSE, allowInsertRow = FALSE, rowHeaders = NULL,allowCut = FALSE,allowDeleteColumn = FALSE,
                 columnSorting = FALSE, colHeaders = colnames(pdata()),
                 tableHeight = "700px")
         })
@@ -1404,10 +1404,22 @@ module_normalization <- function (id, object, config)
             if (!is.null(data$inc))
                 fig <- add_trace(fig, x = ~x, y = ~inc, type = "scatter",
                   mode = "lines+markers", name = "Cummu.")
-            layout(fig, xaxis = list(title = ""), yaxis = list(title = "ID"),
-                legend = list(orientation = "h", x = 0, y = 1.01,
-                  yanchor = "bottom"))
+            if (input$hideLegend) {
+                 layout(fig, xaxis = list(title = ""), yaxis = list(title = "ID"),
+                showlegend = FALSE
+                  )
+            }
+            else {
+                layout(fig, xaxis = list(title = ""), yaxis = list(title = "ID"),
+                legend = list(orientation = "h", x = 0, y = 1.01,yanchor = "bottom")
+                  )
+            }
+
+
+
         })
+        #
+
         observe({
             req(stats()$pcImp)
             cn <- colnames(stats()$pcImp)
@@ -1542,9 +1554,15 @@ module_normalization_ui <- function (id, viewOnly = FALSE)
             tags$b("PCA no imputation"), plotly_scatter_ui(ns("pca_noimpute"),
                 height = "366px")), column(width = 6, tags$b("PCA imputation"),
             plotly_scatter_ui(ns("pca_impute"),
-                height = "366px")), column(width = 6, tags$b("Intensity distribution"),
+            height = "366px")), column(width = 6, tags$b("Intensity distribution"),
+            checkboxInput(
+            inputId = ns("hideLegend"),
+            label   = "Hide legend in plots",
+            value   = FALSE
+            ),
             plotly_boxplot_ui(ns("boxplotly"))),
-            column(width = 6, tags$b("Protein ID"), plotlyOutput(ns("barplot"))))))))
+            column(width = 6, tags$b("Protein ID"), 
+            plotlyOutput(ns("barplot"))))))))
 }
 
 
