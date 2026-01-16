@@ -2267,9 +2267,13 @@ read.proteinGroups.lf <- function (file)
     df <- df[vi, ]
     if (!"Intensity." %in% df$val)
         stop("The proteinGroup.txt table should have at least Intensity columns!")
-    i <- !(grepl("^REV_", pg$Majority.protein.IDs) | grepl("^CON_",
-        pg$Majority.protein.IDs) | pg$Only.identified.by.site ==
-        "+")
+    #i <- !(grepl("^REV_", pg$Majority.protein.IDs) | grepl("^CON_",
+    #    pg$Majority.protein.IDs) | pg$Only.identified.by.site ==
+    #    "+")
+
+    i <- !(pg$Reverse =="+" | pg$Potential.contaminant =="+" | pg$Only.identified.by.site =="+")
+
+    
     annot <- pg[i, -grep(paste(df$val, collapse = "|"), colnames(pg))]
     getExpr <- function(x, type = "iBAQ.", log = TRUE, keep.row = NULL) {
         ic <- grep(type, colnames(x), ignore.case = FALSE, value = TRUE)
