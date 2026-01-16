@@ -2317,7 +2317,7 @@ read.proteinGroups.tmt <- function (file, xref = NULL)
 
     ir <- c(
             which(ab$Only.identified.by.site =="+"),
-            which(ab$Reverse =="+")
+            which(ab$Reverse =="+"),
             which(ab$Potential.contaminant =="+")
             )    
 
