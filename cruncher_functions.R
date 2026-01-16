@@ -2310,9 +2310,17 @@ read.proteinGroups.lf <- function (file)
 read.proteinGroups.tmt <- function (file, xref = NULL)
 {
     ab <- read.delim(file, stringsAsFactors = FALSE)
-    ir <- c(grep("^CON_", ab$Majority.protein.IDs), grep("^REV_",
-        ab$Majority.protein.IDs), which(ab$Only.identified.by.site ==
-        "+"))
+    #ir <- c(grep("^CON_", ab$Majority.protein.IDs), grep("^REV_",
+    #    ab$Majority.protein.IDs), which(ab$Only.identified.by.site ==
+    #    "+"))
+
+
+    ir <- c(
+            which(ab$Only.identified.by.site =="+"),
+            which(ab$Reverse =="+")
+            which(ab$Potential.contaminant =="+")
+            )    
+
     eSum <- c("Fraction", "Reporter.intensity.corrected", "Reporter.intensity",
         "Reporter.intensity.count")
     ls <- list()
