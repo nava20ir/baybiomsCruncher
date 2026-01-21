@@ -1,6 +1,57 @@
 source('libs.R')
 source('all_colors.R')
 
+make_readme_table <- function(){
+
+  firlst_col = c(
+      'log10_protein_intensity_imputed',
+      'log10_protein_intensity',
+      'sample_description',
+      'principle_component_analysis',
+      'differential_t_test',
+      'geneset_annotation'
+    )
+
+  second_col = c(
+      'This tab entails all detected proteinGroups in a given experiment (one proteinGroup per row).
+      A proteinGroup can be a sinlge protein or a set of several proteins that cannot be unambiguously distinguished from each other based on the identified peptides
+      in a mass-spectrometry experiment. Hence, a protein group can contain one or more protein entries that are supported by the same or overlapping sets of identified
+      peptides so that the database search tool cannot distinguish which exact protein or proteins are present in a given sample.
+      For all detected proteinGroups further protein related information is provided: 
+      "protein ID" = the protein identifier as provided in the fasta file; for a proteinGroup consisting of a set of proteins, 
+      each individual protein ID is shown here separated by a semicolon
+      "gene names" = the gene name as provided in the used fasta file(s)
+      "protein names" = the protein name as provide in the used fasta file(s)
+      "peptide counts all" = the total number of detected peptides per proteinGroup
+      "peptide counts unique" = the number of detected peptides that uniquely match to the specific proteinGroup
+      "number of proteins" = the total number of proteins that make up a proteinGroup
+      "fasta headers" = the complete header for a given protein in the used fasta file(s)
+      Potentially, additional protein parameters can be added, like for example protein molecular weight, protein sequence length or sequence coverages. 
+      Quantitative protein information is provided for all proteinGroups on protein level in form of log10-transformed protein intensity values
+      (option 1: LFQ intensities; option 2 iBAQ intensities).
+      In this tab,  missing values of specific proteinGroups in specific samples have been imputed by filling in low-intensity values
+      (option1: “normal distribution” (Perseus); option 2 minimum detected intensity/2, capped at the 15th percentile).',
+      "This tab entails the same information as tab “log10_protein_intensity_imputed”, except that here no intensity imputation has been performed.
+      Hence missing values for specific proteins in specific samples remain (empty cells).",
+      "This tab entails information about all analyzed samples, their sample names, information on biological or technical replicates,
+      as well as the total number of detected features (proteinGroups).",
+      "This tab entails the same information as tab sample_description, and additionally the data of a principle compenent analysis,
+      including the coordinates of component 1, 2 and 3.",
+      "This tab entails the “volcano plot” results for previously defined pairwise comparisons between always two “conditions”
+      (as defined in the sample description tab). For each vulcano plot three columns are provided:
+      log10_fold_change diff = log10-fransformed ratio between a proteinGroups intensity measured in condition A versus condition B
+      -log10 BH_adjusted_pvalue = log10-transformed p-values from a two-sided Student’s t-test adjusted by the Benjamini-Hochberg procedure
+      -log10 pvalue =  log10-transformed p-values from a two-sided Student’s t-test
+      In case several pairwise comparisons between several conditions have been specified, volcano plot results for all of them can be found here",
+      "This tabs entails the geneset annotations (column gsId) for all detected proteins across the complete dataset. 
+      The protein annotations were obtained using the tools InterProScan (PMID: 18025686)  and PANNZER (PMID: 34562305)."
+  )
+  return(data.frame('tab_name' = firlst_col, description=second_col))
+}
+
+
+
+
 aaFreq <- function (x) 
 {
   aa <- c("A", "C", "D", "E", "F", "G", "H", "I", "K", "L", 
@@ -225,6 +276,7 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     req(eset <- reactive_eset())
     attr(eset, "cormat")
   })
+
   output$download <- downloadHandler(filename = function() {
     # changing the final excel file
     id <- ''
@@ -257,9 +309,17 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     withProgress(message = "Writing table", value = 0, {
    
 
-      wb <- createWorkbook(creator = "BayBioMS")
-      feature_info <- td(fdata())
-      meta_cols <- feature_info[,grepl(x=colnames(feature_info),pattern='General|ID')]
+    wb <- createWorkbook(creator = "BayBioMS")
+    feature_info <- td(fdata())
+    meta_cols <- feature_info[,grepl(x=colnames(feature_info),pattern='General|ID')]
+
+    
+
+
+    # readme tab 
+    readme_table <- make_readme_table()
+    addWorksheet(wb, sheetName = "README")
+    writeData(wb, sheet = "README", readme_table)
 
       # imputed data
       if (!is.null(ig)) {
@@ -267,28 +327,39 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
         writeData(wb, sheet = "log10_protein_intensity_imputed", cbind(meta_cols,td(ig)))
       }
 
-      # expression data
-      addWorksheet(wb, sheetName = "log10_protein_intensity")
-      incProgress(1/6, detail = "expression matrix")
-      writeData(wb, sheet = "log10_protein_intensity", cbind(meta_cols,td(expr())))
+    # expression data
+    addWorksheet(wb, sheetName = "log10_protein_intensity")
+    incProgress(1/6, detail = "expression matrix")
+    writeData(wb, sheet = "log10_protein_intensity", cbind(meta_cols,td(expr())))
 
 
-      # adding raw data; we retrieve them from the RDS object
-      addWorksheet(wb, sheetName = "Raw_data")
-      incProgress(1/6, detail = "writing geneset input sheet")
-      object_info <- readRDS(file.path(.dir(), "obj.RDS"))
+    # adding raw data; we retrieve them from the RDS object
+    addWorksheet(wb, sheetName = "Raw_data")
+    incProgress(1/6, detail = "writing geneset input sheet")
+    object_info <- readRDS(file.path(.dir(), "obj.RDS"))
       
-      tryCatch({
-        raw_exprs <- 10 ^ object_info$exprs
-        writeData(wb, sheet = "Raw_data", cbind(object_info$annot,raw_exprs))
-      }, error = function(e) {
-        message("⚠️ Error while gettting the raw data as first attempt: ", e$message)
-        writeData(wb, sheet = "Raw_data", object_info$annot)
-      })
+    tryCatch({
+      raw_exprs <- 10 ^ object_info$exprs
+      print(dim(raw_exprs))
 
-      # t-test results
-      addWorksheet(wb, sheetName = "Differential_t_test")
-      incProgress(1/6, detail = "Differential expression analysis")
+      if (is.null(dim(raw_exprs))) {
+
+        pg_group_file <- file.path(gsub('ESVProject','',.dir()),'combined','txt','proteinGroups.txt')
+        print('Using MQ protein Group file for raw data')
+        pg_df <- read.delim(pg_group_file,stringsAsFactors = FALSE,check.names = FALSE)
+        writeData(wb, sheet = "Raw_data", pg_df)
+      } else {
+      
+      writeData(wb, sheet = "Raw_data", cbind(object_info$annot,raw_exprs))
+
+      }
+
+    }, error = function(e) {
+      message("⚠️ Error while gettting the raw data as first attempt: ", e$message)
+      writeData(wb, sheet = "Raw_data", object_info$annot)
+    })
+
+
       feature_info <- feature_info[,grepl(colnames(feature_info),pattern='General|ttest')]
       feature_info = feature_info [,grepl(x = colnames(feature_info), pattern = "General|log.fdr|log.pvalue|.mean")]
       colnames(feature_info) <- gsub(x=colnames(feature_info),pattern = 'fdr',replacement = 'BH_adjusted_pvalue')
@@ -303,19 +374,19 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       #                               ifelse(grepl("fdr", cols), 3, NA)))
       #new_order <- order(iter_num, feature_order)
       #df <- df[, new_order]
-      writeData(wb, sheet = "Differential_t_test", feature_info)
+
 
       # adding meta data
       addWorksheet(wb, sheetName = "sample_description")
-      incProgress(1/6, detail = "Sample description table")
+      incProgress(2/4, detail = "sample description table")
       meta_df <- td(pdata())
       pca_df <-  meta_df 
       pca_df <- pca_df[, !grepl(x = colnames(pca_df), pattern = "All.PC[4-9]")]
       meta_df <- meta_df[, !grepl(x=colnames(meta_df),pattern='^PCA')]
       writeData(wb, sheet = "sample_description", meta_df)
       # adding PCA table
-      addWorksheet(wb, sheetName = "Principal_component_analysis")
-      writeData(wb, sheet = "Principal_component_analysis", pca_df)      
+      addWorksheet(wb, sheetName = "principal_component_analysis")
+      writeData(wb, sheet = "principal_component_analysis", pca_df)      
 
 
       # adding gene-set annot
@@ -327,11 +398,17 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       })
 
       addWorksheet(wb, sheetName = "Geneset_annotation")   
-      incProgress(1/6, detail = "writing geneset annotation")
+      incProgress(3/4, detail = "writing geneset annotation")
       writeData(wb, sheet = "Geneset_annotation", gene_set_annot_df)
 
+
+      # t-test results
+      addWorksheet(wb, sheetName = "differential_t_test")
+      incProgress(1/4, detail = "differential expression analysis")
+      writeData(wb, sheet = "differential_t_test", feature_info)
+
       # saving the excel table
-      incProgress(1/6, detail = "Saving Result_table")
+      incProgress(4/4, detail = "Saving Result_table")
       saveWorkbook(wb, file = file, overwrite = TRUE)
  
 
