@@ -1,6 +1,45 @@
 source('libs.R')
 source('all_colors.R')
 
+
+
+
+clean_column_names <- function(df){
+      # removing the prefix General.All from all column names
+      colnames(df) <- gsub(x=colnames(df),pattern = 'General.All.',replacement = '')
+      colnames(df) <- gsub(x=colnames(df),pattern = 'General.', replacement = '')
+      colnames(df) <- gsub(x=colnames(df),pattern = '.All.', replacement = '')
+      return(df)
+}
+
+re_order_ttest_columns <- function(df,
+                                    adjusted_pvalue_pattern = 'BH_adjusted',
+                                    pvalue_pattern = 'log10.pvalue',
+                                    foldchange_pattern = 'fold_change' ) {
+      
+      
+    bh_adjuste_index = grep(adjusted_pvalue_pattern, colnames(df)) 
+    pvalue_index = grep(pvalue_pattern, colnames(df)) 
+    foldchange_index = grep(foldchange_pattern, colnames(df)) 
+
+
+    new_inds <- c()
+    for (i in 1:length(bh_adjuste_index)){
+      new_inds <- c(new_inds,foldchange_index[i],bh_adjuste_index[i],pvalue_index[i])
+      i = i + 1
+    }
+
+
+    all_cols_ind = 1:ncol(df)
+    removed_cols = which(!all_cols_ind %in% new_inds)
+    new_orders <- c(removed_cols,new_inds)
+
+    final_df = df[,new_orders]
+    return(final_df)
+}
+
+
+
 make_readme_table <- function(){
 
   firlst_col = c(
@@ -314,49 +353,39 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     meta_cols <- feature_info[,grepl(x=colnames(feature_info),pattern='General|ID')]
 
     
-
-
     # readme tab 
     readme_table <- make_readme_table()
-    addWorksheet(wb, sheetName = "README")
-    writeData(wb, sheet = "README", readme_table)
+    addWorksheet(wb, sheetName = "tab_information")
+    writeData(wb, sheet = "tab_information", readme_table)
 
-      # imputed data
-      if (!is.null(ig)) {
-        addWorksheet(wb, sheetName = "log10_protein_intensity_imputed")
-        writeData(wb, sheet = "log10_protein_intensity_imputed", cbind(meta_cols,td(ig)))
-      }
+    # imputed data with imputation
+    if (!is.null(ig)) {
+      addWorksheet(wb, sheetName = "log10_protein_intensity_imputed")
+      writeData(wb, sheet = "log10_protein_intensity_imputed", clean_column_names(cbind(meta_cols,td(ig))))
+    }
 
-    # expression data
+    # expression data with no imputation
     addWorksheet(wb, sheetName = "log10_protein_intensity")
     incProgress(1/6, detail = "expression matrix")
-    writeData(wb, sheet = "log10_protein_intensity", cbind(meta_cols,td(expr())))
+    writeData(wb, sheet = "log10_protein_intensity", clean_column_names(cbind(meta_cols,td(expr()))))
 
 
-    # adding raw data; we retrieve them from the RDS object
-    addWorksheet(wb, sheetName = "Raw_data")
+    # adding raw data; we retrieve them from the RDS object if it the input is a tsv file oterhwise we use the proteinGroups.txt file from MQ
+    addWorksheet(wb, sheetName = "raw_data")
     incProgress(1/6, detail = "writing geneset input sheet")
     object_info <- readRDS(file.path(.dir(), "obj.RDS"))
-      
     tryCatch({
       raw_exprs <- 10 ^ object_info$exprs
-      print(dim(raw_exprs))
-
-      if (is.null(dim(raw_exprs))) {
-
+      if (is.null(dim(raw_exprs))) {  # if it is mQ data
         pg_group_file <- file.path(gsub('ESVProject','',.dir()),'combined','txt','proteinGroups.txt')
-        print('Using MQ protein Group file for raw data')
         pg_df <- read.delim(pg_group_file,stringsAsFactors = FALSE,check.names = FALSE)
         writeData(wb, sheet = "Raw_data", pg_df)
-      } else {
-      
+      } else { # if it is tsv data
       writeData(wb, sheet = "Raw_data", cbind(object_info$annot,raw_exprs))
-
       }
-
-    }, error = function(e) {
+    }, error = function(e) { # in casse it fails, we just write the annotation table/ meta data
       message("⚠️ Error while gettting the raw data as first attempt: ", e$message)
-      writeData(wb, sheet = "Raw_data", object_info$annot)
+      writeData(wb, sheet = "raw_data", object_info$annot)
     })
 
 
@@ -366,14 +395,15 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       colnames(feature_info) <- gsub(x=colnames(feature_info),pattern = '.log.',replacement = '.log10.')
       colnames(feature_info) <- gsub(x=colnames(feature_info),pattern = 'mean',replacement = 'log10_fold_change')
 
-      ## the idea is to re-order the columns with mean first and then fdr and then pvalue for now we skip it this way 
-      #cols <- colnames(df)
-      #iter_num <- as.numeric(sub(".*?(\\d+).*", "\\1", cols))
-      #feature_order <- ifelse(grepl("mean", cols), 1,
-      #                        ifelse(grepl("pvalue", cols), 2,
-      #                               ifelse(grepl("fdr", cols), 3, NA)))
-      #new_order <- order(iter_num, feature_order)
-      #df <- df[, new_order]
+      # re-ordering t-test columns
+      try({
+        
+        feature_info <- re_order_ttest_columns(feature_info,
+                                  adjusted_pvalue_pattern = 'BH_adjusted_pvalue',
+                                  pvalue_pattern = 'log10.pvalue',
+                                  foldchange_pattern = 'log10_fold_change' )
+      })
+
 
 
       # adding meta data
@@ -383,10 +413,12 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       pca_df <-  meta_df 
       pca_df <- pca_df[, !grepl(x = colnames(pca_df), pattern = "All.PC[4-9]")]
       meta_df <- meta_df[, !grepl(x=colnames(meta_df),pattern='^PCA')]
-      writeData(wb, sheet = "sample_description", meta_df)
+      writeData(wb, sheet = "sample_description", clean_column_names(meta_df))
+
+
       # adding PCA table
-      addWorksheet(wb, sheetName = "principal_component_analysis")
-      writeData(wb, sheet = "principal_component_analysis", pca_df)      
+      addWorksheet(wb, sheetName = "PCA_imputed_perseus")
+      writeData(wb, sheet = "PCA_imputed_perseus", clean_column_names(pca_df))      
 
 
       # adding gene-set annot
@@ -394,18 +426,19 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       # to merge the gene set annot with the information about the 
 
       try ({
-        gene_set_annot_df <- merge(gene_set_annot_df,meta_cols,by.x = 'featureId', by.y = 'ID' )
+        gene_set_annot_df <- merge(meta_cols,gene_set_annot_df,by.y = 'featureId', by.x = 'ID' )
+        colnames(gene_set_annot_df) <- gsub(x=colnames(gene_set_annot_df),pattern = 'gsId',replacement = 'Gene_set_ID')
+
       })
 
-      addWorksheet(wb, sheetName = "Geneset_annotation")   
+      addWorksheet(wb, sheetName = "geneset_annotation")   
       incProgress(3/4, detail = "writing geneset annotation")
-      writeData(wb, sheet = "Geneset_annotation", gene_set_annot_df)
-
+      writeData(wb, sheet = "geneset_annotation", clean_column_names(gene_set_annot_df))
 
       # t-test results
       addWorksheet(wb, sheetName = "differential_t_test")
       incProgress(1/4, detail = "differential expression analysis")
-      writeData(wb, sheet = "differential_t_test", feature_info)
+      writeData(wb, sheet = "differential_t_test", clean_column_names(feature_info))
 
       # saving the excel table
       incProgress(4/4, detail = "Saving Result_table")
@@ -563,23 +596,76 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
 }
 
 
-app_ui <- function (id, showDropList = TRUE, activeTab = "Feature") 
-{
+app_ui <- function(id, showDropList = TRUE, activeTab = "Feature") {
   ns <- NS(id)
-  comp <- list(useShinyjs(), style = "background:white;", absolutePanel(top = 5, 
-                                                                        right = 20, style = "z-index: 9999;", width = 115, downloadButton(outputId = ns("download"), 
-                                                                                label = "xlsx", class = NULL), actionButton(ns("snapshot"), 
-                                                                                label = NULL, icon = icon("camera-retro"))), shinyjs::hidden(div(id = ns("contents"), 
-                                                                                column(6, L1_data_space_ui(ns("dataspace"), activeTab = activeTab)), 
-                                                                                column(6, L1_result_space_ui(ns("resultspace"))))))
+
+  comp <- list(
+    useShinyjs(),
+    style = "background:white;",
+    absolutePanel(
+      top = 5,
+      right = 20,
+      style = "z-index: 9999;",
+      width = 115,
+      downloadButton(
+        outputId = ns("download"),
+        label = "Download Excel file",
+        class = NULL
+      ),
+      actionButton(
+        ns("snapshot"),
+        label = NULL,
+        icon = icon("camera-retro")
+      )
+    ),
+    shinyjs::hidden(
+      div(
+        id = ns("contents"),
+        column(
+          6,
+          L1_data_space_ui(ns("dataspace"), activeTab = activeTab)
+        ),
+        column(
+          6,
+          L1_result_space_ui(ns("resultspace"))
+        )
+      )
+    )
+  )
+
   if (showDropList) {
-    l2 <- list(shinycssloaders::withSpinner(uiOutput(ns("summary")), 
-                                            hide.ui = FALSE, type = 8, color = "green"), br(), 
-               absolutePanel(top = 8, right = 140, style = "z-index: 9999;", 
-                             selectizeInput(inputId = ns("selectFile"), label = NULL, 
-                                            choices = NULL, width = "500px", options = list(placeholder = "Select a dataset here"))))
+    l2 <- list(
+      shinycssloaders::withSpinner(
+        uiOutput(ns("summary")),
+        hide.ui = FALSE,
+        type = 8,
+        color = "green"
+      ),
+      br(),
+      absolutePanel(
+        top = 8,
+        right = 140,
+        style = "z-index: 9999;",
+        tagList(
+          tags$span("You should Select to open your dataset from bellow dropdown for Download/Visualizations:" , style = "font-weight: bold; font-size: 18px; color: red;"),  # label text
+          selectizeInput(
+            inputId = ns("selectFile"),
+            label = NULL,                  # no built-in label
+            choices = NULL,
+            width = "500px",
+            options = list(
+              placeholder = "Select a dataset here",
+              openOnFocus = TRUE,
+              maxOptions = 5
+            )
+          )
+        )
+      )
+    )
+
     comp <- c(l2, comp)
   }
+
   do.call(fluidRow, comp)
 }
 
@@ -3122,33 +3208,37 @@ L1_data_space_module <- function (input, output, session, expr, pdata, fdata, re
 }
 
 
-L1_data_space_ui <- function (id, activeTab = "Feature") 
-{
-  ns <- NS(id)
-  navbarPage("Data", id = ns("eset"), selected = activeTab, 
-            theme = shinytheme("spacelab"), tabPanel("Feature", meta_scatter_ui(ns("feature_space"))), 
-            tabPanel("Feature table", dataTable_ui(ns("tab_feature"))), 
-            tabPanel("Sample", meta_scatter_ui(ns("sample_space"))), 
-            tabPanel("Sample table", dataTable_ui(ns("tab_pheno"))), 
-            tabPanel("Cor", fluidRow(column(6, dropdown(inputId = "mydropdown2", 
-            label = "Controls", circle = FALSE, status = "default", 
-            icon = icon("cog"), width = 700, tooltip = tooltipOptions(title = "Click to update heatmap and check legend!"), 
-            margin = "10px", tabsetPanel(tabPanel("Parameters", 
-            iheatmapInput(id = ns("corheatmapViewer"), scaleOn = "none")), 
-            tabPanel("Legend", iheatmapLegend(id = ns("corheatmapViewer")))))), 
-            column(6, align = "right", iheatmapClear(id = ns("corheatmapViewer"))), 
-            column(12, iheatmapOutput(id = ns("corheatmapViewer"))))), 
-            tabPanel("Heatmap", fluidRow(column(6, dropdown(inputId = "mydropdown", 
-            label = "Controls", circle = FALSE, status = "default", 
-            icon = icon("cog"), width = 700, tooltip = tooltipOptions(title = "Click to update heatmap and check legend!"), 
-            margin = "10px", tabsetPanel(tabPanel("Parameters", 
-            iheatmapInput(id = ns("heatmapViewer"))), tabPanel("Legend", 
-                                                              iheatmapLegend(id = ns("heatmapViewer")))))), 
-            column(6, align = "right", iheatmapClear(id = ns("heatmapViewer"))), 
-            column(12, iheatmapOutput(id = ns("heatmapViewer"))))), 
-            tabPanel("Expression", dataTable_ui(ns("tab_expr"))), 
-            tabPanel("GSList", gslist_ui(ns("gsList"))))
-}
+ L1_data_space_ui <- function (id, activeTab = "Feature") 
+ {
+   ns <- NS(id)
+   navbarPage("Data", id = ns("eset"), selected = activeTab, 
+             theme = shinytheme("spacelab"), tabPanel("Feature", meta_scatter_ui(ns("feature_space"))), 
+             tabPanel("Feature table", dataTable_ui(ns("tab_feature"))), 
+             tabPanel("Sample", meta_scatter_ui(ns("sample_space"))), 
+             tabPanel("Sample table", dataTable_ui(ns("tab_pheno"))), 
+             tabPanel("Cor", fluidRow(column(6, dropdown(inputId = "mydropdown2", 
+             label = "Controls", circle = FALSE, status = "default", 
+             icon = icon("cog"), width = 700, tooltip = tooltipOptions(title = "Click to update heatmap and check legend!"), 
+             margin = "10px", tabsetPanel(tabPanel("Parameters", 
+             iheatmapInput(id = ns("corheatmapViewer"), scaleOn = "none")), 
+             tabPanel("Legend", iheatmapLegend(id = ns("corheatmapViewer")))))), 
+             column(6, align = "right", iheatmapClear(id = ns("corheatmapViewer"))), 
+             column(12, iheatmapOutput(id = ns("corheatmapViewer"))))), 
+             tabPanel("Heatmap", fluidRow(column(6, dropdown(inputId = "mydropdown", 
+             label = "Controls", circle = FALSE, status = "default", 
+             icon = icon("cog"), width = 700, tooltip = tooltipOptions(title = "Click to update heatmap and check legend!"), 
+             margin = "10px", tabsetPanel(tabPanel("Parameters", 
+             iheatmapInput(id = ns("heatmapViewer"))), tabPanel("Legend", 
+                                                               iheatmapLegend(id = ns("heatmapViewer")))))), 
+             column(6, align = "right", iheatmapClear(id = ns("heatmapViewer"))), 
+             column(12, iheatmapOutput(id = ns("heatmapViewer"))))), 
+             tabPanel("Expression", dataTable_ui(ns("tab_expr"))), 
+             tabPanel("GSList", gslist_ui(ns("gsList"))))
+ }
+
+
+
+
 
 
 L1_result_space_module <- function (input, output, session, reactive_expr, reactive_phenoData, 
