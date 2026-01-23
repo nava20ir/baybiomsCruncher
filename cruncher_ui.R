@@ -3,7 +3,7 @@ source('cruncher_functions.R')
 cruncher_ui <- function (id, viewOnly = FALSE)
 {
     ns <- NS(id)
-    dashboardPage(dashboardHeader(title = "Cruncher V2"),
+    dashboardPage(dashboardHeader(title = "BayBioMS Cruncher"),
         dashboardSidebar(useShinyjs(), 
         sidebarMenu(id = ns("tabs"),
             menuItem("Data Loading", tabName = ns("loading"),

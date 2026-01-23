@@ -54,6 +54,7 @@ make_readme_table <- function() {
   first_col <- c(
     "log10_prot_int_imputed",
     "log10_prot_int",
+    "raw_data",
     "sample_description",
     "principle_component_analysis",
     "differential_t_test",
@@ -65,34 +66,46 @@ make_readme_table <- function() {
     paste(
       "This tab entails all detected proteinGroups in a given experiment (one proteinGroup per row).",
       "A proteinGroup can be a single protein or a set of several proteins that cannot be unambiguously distinguished from each other based on the identified peptides",
-      "in a mass-spectrometry experiment. Hence, a proteinGroup can contain one or more protein entries that are supported by the same or overlapping sets of identified",
-      "peptides so that the database search tool cannot distinguish which exact protein or proteins are present in a given sample.",
+      "in a mass-spectrometry experiment. Hence, a proteinGroup can contain one or more protein entries that are supported by the same or overlapping sets of",
+      "identified peptides, so that the database search tool cannot distinguish which exact protein(s) are present in a given sample.",
+      "",
+      "",
       "",
       "For all detected proteinGroups further protein related information is provided:",
-      "protein ID = the protein identifier as provided in the fasta file",
-      "gene names = the gene name as provided in the used fasta file(s)",
-      "protein names = the protein name as provided in the used fasta file(s)",
-      "peptide counts all = the total number of detected peptides per proteinGroup",
-      "peptide counts unique = the number of detected peptides that uniquely match to the specific proteinGroup",
-      "number of proteins = the total number of proteins that make up a proteinGroup",
-      "fasta headers = the complete header for a given protein in the used fasta file(s)",
+      "Protein IDs = the protein identifier as provided in the used fasta file(s)",
+      "Peptide counts all = the total number of detected peptides per proteinGroup",
+      "Peptide counts unique = the number of detected peptides that uniquely match to the specific proteinGroup",
+      "Protein names = the protein name as provided in the used fasta file(s)",
+      "Gene names = the gene name as provided in the used fasta file(s)",
+      "Fasta headers = the complete header for a given protein in the used fasta file(s)",
+      "Number of proteins = the total number of proteins that make up a proteinGroup",
       "",
-      "Quantitative protein information is provided for all proteinGroups on protein level in form of log10-transformed protein intensity values.",
-      "the intensity values could be iBAQ or LFQ upon the user selection during the data processing step.",
+      "",
+      "",
+      "Quantitative information is provided for all proteinGroups in form of log10-transformed mass spectrometric intensity values. The intensity values could be",
+      "iBAQs or LFQs, depending on the operator's selection during data processing step.",
+      "",
+      "",
+      "",
       "In this tab, missing values have been imputed.",
       sep = "\r\n"
     ),
 
     paste(
-      "This tab entails the same information as tab log10_prot_int_imputed,",
-      "except that no intensity imputation has been performed.",
-      "Missing values remain empty.",
+      "This tab entails the same information as tab log10_prot_int_imputed, except that no intensity imputation has been performed.",
+      "Missing values remain as empty cells.",
       sep = "\r\n"
     ),
 
     paste(
-      "This tab entails information about all analyzed samples,",
-      "including sample names, replicates, and total detected proteinGroups.",
+      "This tab entails the raw data output as produced by the used search engine, for MaxQuant it represents the complete proteinGroups.txt file.",
+      "",
+      sep = "\r\n"
+    ),    
+
+    paste(
+      "This tab entails information about all analyzed samples, including sample names, replicates, and total detected proteinGroups per sample.",
+      "",
       sep = "\r\n"
     ),
 
@@ -103,23 +116,27 @@ make_readme_table <- function() {
     ),
 
     paste(
-      "This tab entails volcano plot results for pairwise condition comparisons.",
-      "Columns include:",
-      "log10_fold_change_diff",
-      "-log10_BH_adjusted_pvalue",
-      "-log10_pvalue",
+      "This tab entails the volcano plot results for previously defined pairwise comparisons between always two conditions (as defined in the",
+      "sample description tab). For each vulcano plot three columns are provided:",
+      "",
+      "log10_fold_change diff = log10-fransformed ratio between a proteinGroups intensity measured in condition A versus condition B",
+      "-log10 BH_adjusted_pvalue = log10-transformed p-values from a two-sided Student’s t-test adjusted by the Benjamini-Hochberg procedure",
+      "-log10 pvalue =  log10-transformed p-values from a two-sided Student’s t-test",
+      "",
+      "In case several pairwise comparisons between several conditions have been specified, volcano plot results for all of them can be found",
+      "here",
       sep = "\r\n"
     ),
 
     paste(
-      "This tab entails geneset annotations for all detected proteins.",
-      "Annotations obtained using InterProScan and PANNZER.",
+      "This tab entails geneset annotations for all detected proteins. Annotations were obtained using InterProScan (PMID: 18025686)  and PANNZER (PMID: 34562305).",
+      "",
       sep = "\r\n"
     ),
 
     paste(
-      "This tab entails the settings used in Cruncher ",
-      "for reproducibilty/Publication.",
+      "This tab entails the parameter settings applied within Cruncher.",
+      "",
       sep = "\r\n"
     )
   )
@@ -484,6 +501,13 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       writeData(wb, sheet = "PCA_imputed_perseus", clean_column_names(pca_df))      
 
 
+      # t-test results
+      addWorksheet(wb, sheetName = "differential_t_test")
+      incProgress(1/4, detail = "differential expression analysis")
+      writeData(wb, sheet = "differential_t_test", clean_column_names(feature_info))
+
+
+
       # adding gene-set annot
       gene_set_annot_df = attr(fdata(), "GS")
       # to merge the gene set annot with the information about the 
@@ -501,10 +525,7 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       incProgress(3/4, detail = "writing geneset annotation")
       writeData(wb, sheet = "geneset_annotation", clean_column_names(gene_set_annot_df))
 
-      # t-test results
-      addWorksheet(wb, sheetName = "differential_t_test")
-      incProgress(1/4, detail = "differential expression analysis")
-      writeData(wb, sheet = "differential_t_test", clean_column_names(feature_info))
+
 
     
       # adding parameter tab
