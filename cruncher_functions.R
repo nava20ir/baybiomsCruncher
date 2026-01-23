@@ -1211,7 +1211,7 @@ module_normalization <- function (id, object, config)
             req(obj())
             selected = conf()$imputationMethod
             print(paste0('imputation method changed: ',selected))
-            cc <- c('none','chen-meng','perseus')
+            cc <- c('none','perseus')
             updateAwesomeRadio(session = session,
                 inputId = "imputationMethod",
                 choices = cc,

@@ -1,7 +1,16 @@
 source('libs.R')
 source('all_colors.R')
 
-
+get_intensity_type <- function(config_file){
+  config <- read_yaml(config_file)
+  if(config$normalization$inputData == "LFQ.intensity"){
+    return('LFQ')
+    
+  }else{
+    return('iBAQ')
+  }
+  
+}
 
 
 clean_column_names <- function(df){
@@ -43,12 +52,13 @@ re_order_ttest_columns <- function(df,
 make_readme_table <- function() {
 
   first_col <- c(
-    "log10_protein_intensity_imputed",
-    "log10_protein_intensity",
+    "log10_prot_int_imputed",
+    "log10_prot_int",
     "sample_description",
     "principle_component_analysis",
     "differential_t_test",
-    "geneset_annotation"
+    "geneset_annotation",
+    "parameters"
   )
 
   second_col <- c(
@@ -68,12 +78,13 @@ make_readme_table <- function() {
       "fasta headers = the complete header for a given protein in the used fasta file(s)",
       "",
       "Quantitative protein information is provided for all proteinGroups on protein level in form of log10-transformed protein intensity values.",
+      "the intensity values could be iBAQ or LFQ upon the user selection during the data processing step.",
       "In this tab, missing values have been imputed.",
       sep = "\r\n"
     ),
 
     paste(
-      "This tab entails the same information as tab log10_protein_intensity_imputed,",
+      "This tab entails the same information as tab log10_prot_int_imputed,",
       "except that no intensity imputation has been performed.",
       "Missing values remain empty.",
       sep = "\r\n"
@@ -103,6 +114,12 @@ make_readme_table <- function() {
     paste(
       "This tab entails geneset annotations for all detected proteins.",
       "Annotations obtained using InterProScan and PANNZER.",
+      sep = "\r\n"
+    ),
+
+    paste(
+      "This tab entails the settings used in Cruncher ",
+      "for reproducibilty/Publication.",
       sep = "\r\n"
     )
   )
@@ -369,7 +386,7 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       data.frame(ID = id, tab)
     }
     
-
+    
 
     ig <- imputeGetter(reactive_eset())
     withProgress(message = "Writing table", value = 0, {
@@ -379,6 +396,9 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     feature_info <- td(fdata())
     meta_cols <- feature_info[,grepl(x=colnames(feature_info),pattern='General|ID')]
 
+
+    config_file <- file.path(.dir(), "config.yaml")
+    intensity_type <- get_intensity_type( config_file )
     
     # readme tab 
     readme_table <- make_readme_table()
@@ -396,16 +416,21 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     writeData(wb, sheet = "tab_information", readme_table)
     #writeData(wb, sheet = "tab_information")
 
+
+
+    imputed_sheet_name = paste0('log10_prot_int_imputed_',intensity_type)
+    unimputed_sheet_name = paste0('log10_prot_int_',intensity_type)
+    
     # imputed data with imputation
     if (!is.null(ig)) {
-      addWorksheet(wb, sheetName = "log10_protein_intensity_imputed")
-      writeData(wb, sheet = "log10_protein_intensity_imputed", clean_column_names(cbind(meta_cols,td(ig))))
+      addWorksheet(wb, sheetName = imputed_sheet_name)
+      writeData(wb, sheet = imputed_sheet_name, clean_column_names(cbind(meta_cols,td(ig))))
     }
 
     # expression data with no imputation
-    addWorksheet(wb, sheetName = "log10_protein_intensity")
+    addWorksheet(wb, sheetName = unimputed_sheet_name)
     incProgress(1/6, detail = "expression matrix")
-    writeData(wb, sheet = "log10_protein_intensity", clean_column_names(cbind(meta_cols,td(expr()))))
+    writeData(wb, sheet = unimputed_sheet_name, clean_column_names(cbind(meta_cols,td(expr()))))
 
 
     # adding raw data; we retrieve them from the RDS object if it the input is a tsv file oterhwise we use the proteinGroups.txt file from MQ
@@ -436,10 +461,10 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       # re-ordering t-test columns
       try({
         
-        feature_info <- re_order_ttest_columns(feature_info,
-                                  adjusted_pvalue_pattern = 'BH_adjusted_pvalue',
-                                  pvalue_pattern = 'log10.pvalue',
-                                  foldchange_pattern = 'log10_fold_change' )
+      feature_info <- re_order_ttest_columns(feature_info,
+                                adjusted_pvalue_pattern = 'BH_adjusted_pvalue',
+                                pvalue_pattern = 'log10.pvalue',
+                                foldchange_pattern = 'log10_fold_change' )
       })
 
 
@@ -466,6 +491,9 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       try ({
         gene_set_annot_df <- merge(meta_cols,gene_set_annot_df,by.y = 'featureId', by.x = 'ID' )
         colnames(gene_set_annot_df) <- gsub(x=colnames(gene_set_annot_df),pattern = 'gsId',replacement = 'Gene_set_ID')
+        if('weight' %in% colnames(gene_set_annot_df)){
+          gene_set_annot_df <- gene_set_annot_df[, !grepl(x=colnames(gene_set_annot_df),pattern='weight')]
+        }
 
       })
 
@@ -477,6 +505,25 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       addWorksheet(wb, sheetName = "differential_t_test")
       incProgress(1/4, detail = "differential expression analysis")
       writeData(wb, sheet = "differential_t_test", clean_column_names(feature_info))
+
+    
+      # adding parameter tab
+      config_text <- paste(
+        readLines(config_file, warn = FALSE),
+        collapse = "\r\n"
+      )
+      
+      param_df = as.data.frame(config_text)
+      addWorksheet(wb, sheetName = "parameters")
+      setColWidths(wb, "parameters", cols = c(1), widths = c(100))
+      addStyle(
+      wb, "parameters",
+      createStyle(wrapText = TRUE),
+      rows = 1:100,
+      cols = 1,
+      gridExpand = TRUE
+    )
+      writeData(wb, sheet = "parameters", param_df)
 
       # saving the excel table
       incProgress(4/4, detail = "Saving Result_table")
