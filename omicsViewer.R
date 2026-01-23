@@ -379,9 +379,9 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       if (is.null(dim(raw_exprs))) {  # if it is mQ data
         pg_group_file <- file.path(gsub('ESVProject','',.dir()),'combined','txt','proteinGroups.txt')
         pg_df <- read.delim(pg_group_file,stringsAsFactors = FALSE,check.names = FALSE)
-        writeData(wb, sheet = "Raw_data", pg_df)
+        writeData(wb, sheet = "raw_data", pg_df)
       } else { # if it is tsv data
-      writeData(wb, sheet = "Raw_data", cbind(object_info$annot,raw_exprs))
+      writeData(wb, sheet = "raw_data", cbind(object_info$annot,raw_exprs))
       }
     }, error = function(e) { # in casse it fails, we just write the annotation table/ meta data
       message("⚠️ Error while gettting the raw data as first attempt: ", e$message)
