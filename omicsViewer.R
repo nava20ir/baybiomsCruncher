@@ -40,53 +40,80 @@ re_order_ttest_columns <- function(df,
 
 
 
-make_readme_table <- function(){
+make_readme_table <- function() {
 
-  firlst_col = c(
-      'log10_protein_intensity_imputed',
-      'log10_protein_intensity',
-      'sample_description',
-      'principle_component_analysis',
-      'differential_t_test',
-      'geneset_annotation'
-    )
-
-  second_col = c(
-      'This tab entails all detected proteinGroups in a given experiment (one proteinGroup per row).
-      A proteinGroup can be a sinlge protein or a set of several proteins that cannot be unambiguously distinguished from each other based on the identified peptides
-      in a mass-spectrometry experiment. Hence, a protein group can contain one or more protein entries that are supported by the same or overlapping sets of identified
-      peptides so that the database search tool cannot distinguish which exact protein or proteins are present in a given sample.
-      For all detected proteinGroups further protein related information is provided: 
-      "protein ID" = the protein identifier as provided in the fasta file; for a proteinGroup consisting of a set of proteins, 
-      each individual protein ID is shown here separated by a semicolon
-      "gene names" = the gene name as provided in the used fasta file(s)
-      "protein names" = the protein name as provide in the used fasta file(s)
-      "peptide counts all" = the total number of detected peptides per proteinGroup
-      "peptide counts unique" = the number of detected peptides that uniquely match to the specific proteinGroup
-      "number of proteins" = the total number of proteins that make up a proteinGroup
-      "fasta headers" = the complete header for a given protein in the used fasta file(s)
-      Potentially, additional protein parameters can be added, like for example protein molecular weight, protein sequence length or sequence coverages. 
-      Quantitative protein information is provided for all proteinGroups on protein level in form of log10-transformed protein intensity values
-      (option 1: LFQ intensities; option 2 iBAQ intensities).
-      In this tab,  missing values of specific proteinGroups in specific samples have been imputed by filling in low-intensity values
-      (option1: “normal distribution” (Perseus); option 2 minimum detected intensity/2, capped at the 15th percentile).',
-      "This tab entails the same information as tab “log10_protein_intensity_imputed”, except that here no intensity imputation has been performed.
-      Hence missing values for specific proteins in specific samples remain (empty cells).",
-      "This tab entails information about all analyzed samples, their sample names, information on biological or technical replicates,
-      as well as the total number of detected features (proteinGroups).",
-      "This tab entails the same information as tab sample_description, and additionally the data of a principle compenent analysis,
-      including the coordinates of component 1, 2 and 3.",
-      "This tab entails the “volcano plot” results for previously defined pairwise comparisons between always two “conditions”
-      (as defined in the sample description tab). For each vulcano plot three columns are provided:
-      log10_fold_change diff = log10-fransformed ratio between a proteinGroups intensity measured in condition A versus condition B
-      -log10 BH_adjusted_pvalue = log10-transformed p-values from a two-sided Student’s t-test adjusted by the Benjamini-Hochberg procedure
-      -log10 pvalue =  log10-transformed p-values from a two-sided Student’s t-test
-      In case several pairwise comparisons between several conditions have been specified, volcano plot results for all of them can be found here",
-      "This tabs entails the geneset annotations (column gsId) for all detected proteins across the complete dataset. 
-      The protein annotations were obtained using the tools InterProScan (PMID: 18025686)  and PANNZER (PMID: 34562305)."
+  first_col <- c(
+    "log10_protein_intensity_imputed",
+    "log10_protein_intensity",
+    "sample_description",
+    "principle_component_analysis",
+    "differential_t_test",
+    "geneset_annotation"
   )
-  return(data.frame('tab_name' = firlst_col, description=second_col))
+
+  second_col <- c(
+    paste(
+      "This tab entails all detected proteinGroups in a given experiment (one proteinGroup per row).",
+      "A proteinGroup can be a single protein or a set of several proteins that cannot be unambiguously distinguished from each other based on the identified peptides",
+      "in a mass-spectrometry experiment. Hence, a proteinGroup can contain one or more protein entries that are supported by the same or overlapping sets of identified",
+      "peptides so that the database search tool cannot distinguish which exact protein or proteins are present in a given sample.",
+      "",
+      "For all detected proteinGroups further protein related information is provided:",
+      "protein ID = the protein identifier as provided in the fasta file",
+      "gene names = the gene name as provided in the used fasta file(s)",
+      "protein names = the protein name as provided in the used fasta file(s)",
+      "peptide counts all = the total number of detected peptides per proteinGroup",
+      "peptide counts unique = the number of detected peptides that uniquely match to the specific proteinGroup",
+      "number of proteins = the total number of proteins that make up a proteinGroup",
+      "fasta headers = the complete header for a given protein in the used fasta file(s)",
+      "",
+      "Quantitative protein information is provided for all proteinGroups on protein level in form of log10-transformed protein intensity values.",
+      "In this tab, missing values have been imputed.",
+      sep = "\r\n"
+    ),
+
+    paste(
+      "This tab entails the same information as tab log10_protein_intensity_imputed,",
+      "except that no intensity imputation has been performed.",
+      "Missing values remain empty.",
+      sep = "\r\n"
+    ),
+
+    paste(
+      "This tab entails information about all analyzed samples,",
+      "including sample names, replicates, and total detected proteinGroups.",
+      sep = "\r\n"
+    ),
+
+    paste(
+      "This tab entails the same information as sample_description,",
+      "plus principal component analysis coordinates (PC1, PC2, PC3).",
+      sep = "\r\n"
+    ),
+
+    paste(
+      "This tab entails volcano plot results for pairwise condition comparisons.",
+      "Columns include:",
+      "log10_fold_change_diff",
+      "-log10_BH_adjusted_pvalue",
+      "-log10_pvalue",
+      sep = "\r\n"
+    ),
+
+    paste(
+      "This tab entails geneset annotations for all detected proteins.",
+      "Annotations obtained using InterProScan and PANNZER.",
+      sep = "\r\n"
+    )
+  )
+
+  data.frame(
+    tab_name = first_col,
+    description = second_col,
+    stringsAsFactors = FALSE
+  )
 }
+
 
 
 
@@ -356,7 +383,18 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
     # readme tab 
     readme_table <- make_readme_table()
     addWorksheet(wb, sheetName = "tab_information")
+    setColWidths(wb, "tab_information", cols = c(1, 2), widths = c(35, 100))
+
+    addStyle(
+      wb, "tab_information",
+      createStyle(wrapText = TRUE),
+      rows = 1:100,
+      cols = 2,
+      gridExpand = TRUE
+    )
+    #mergeCells(wb, "tab_information", cols = 1:ncol(readme_table), rows = 1:nrow(readme_table))
     writeData(wb, sheet = "tab_information", readme_table)
+    #writeData(wb, sheet = "tab_information")
 
     # imputed data with imputation
     if (!is.null(ig)) {
