@@ -1355,79 +1355,166 @@ drawButton <- function (id)
 }
 
 
-enrichment_analysis_module <- function (input, output, session, reactive_featureData, reactive_i) 
-{
-  ns <- session$ns
-  reactive_pathway <- reactive({
-    attr(reactive_featureData(), "GS")
-  })
-  rii <- reactiveVal()
-  observe({
-    req(reactive_i())
-    if (length(reactive_i()) <= 1) 
-      return(NULL)
-    if (length(reactive_i()) <= 3) 
-      rii("notest")
-    else rii(reactive_i())
-  })
-  oraTab <- reactive({
-    req(rii())
-    notest <- "No geneset has been tested, please try to include more input feature IDs!"
-    if (rii()[1] == "notest") 
-      return(notest)
-    tab <- vectORATall(reactive_pathway(), i = rii(), background = nrow(reactive_featureData()))
-    if (is.null(tab)) 
-      return(notest)
-    ic <- which(vapply(tab, function(x) is.numeric(x) & !is.integer(x), 
-                       logical(1)))
-    tab[, ic] <- lapply(tab[, ic], signif, digits = 3)
-    tab <- tab[which(tab$p.adjusted < 0.1 | tab$p.value < 
-                       0.05 | tab$OR >= 3), ]
-    tab
-  })
-  output$errorMsg <- renderText({
-    req(is.character(oraTab()))
-    oraTab()
-  })
-  output$error <- renderUI(verbatimTextOutput(ns("errorMsg")))
-  vi <- callModule(dataTableDownload_module, id = "stab", reactive_table = reactive({
-    req(is.data.frame(oraTab()))
-    oraTab()
-  }), reactive_cols = reactive(setdiff(colnames(oraTab()), 
-                                       "overlap_ids")), prefix = "ORA_", sortBy = "p.value", 
-  decreasing = FALSE)
-  hd <- reactive({
-    req(is.data.frame(oraTab()))
-    req(i <- vi())
-    ii <- grep("^General", colnames(reactive_featureData()), 
-               ignore.case = TRUE)
-    if (length(ii) == 0) 
-      ii <- seq_len(min(3, ncol(reactive_featureData())))
-    i <- oraTab()[i, ]
-    hid <- i$overlap_ids[[1]]
-    req(hid)
-    df1 <- reactive_featureData()[hid, ii, drop = FALSE]
-    df1 <- cbind(Overlap = "+", df1)
-    apath <- reactive_pathway()[reactive_pathway()$gsId == 
-                                  i$pathway, ]
-    aid <- setdiff(apath$featureId, hid)
-    if (length(aid) > 0) {
-      df2 <- reactive_featureData()[aid, ii, drop = FALSE]
-      df2 <- cbind(Overlap = "", df2)
-      df1 <- rbind(df1, df2)
-    }
-    df1
-  })
-  vi2 <- callModule(dataTableDownload_module, id = "overlapTab", 
-                    reactive_table = hd, prefix = "ORA_overlapGenes_")
-}
+ enrichment_analysis_module <- function (input, output, session, reactive_featureData, reactive_i) 
+ {
+   ns <- session$ns
 
 
-enrichment_analysis_ui <- function (id) 
-{
+# output$example_plot <- renderPlot({ req(is.data.frame(oraTab()))
+# df <- oraTab()
+#  ggplot(df, aes( x = -log10(p.adjusted), y = reorder(pathway, p.adjusted) )) + 
+#  geom_segment( aes( x = 0, xend = -log10(p.adjusted), y = pathway, yend = pathway, size = OR ), color = "grey60" ) +
+#   geom_point( aes( size = p.value, color = OR ) ) + 
+#   scale_size_continuous(name = "p-value", range = c(2, 8)) + 
+#   scale_color_viridis_c(name = "Odds ratio") +
+#    labs( x = "-log10(adjusted p-value)", y = "Pathway", title = "ORA Lollipop Plot" ) +
+#     theme_minimal(base_size = 12) + 
+#     theme( axis.text.y = element_text(size = 10), legend.position = "right" ) })
+
+
+output$loli_plot <- renderPlotly({
+
+  tab <- oraTab()
+  if (!is.data.frame(tab) || nrow(tab) == 0)
+    return(plotly_empty())
+
+  df <- tab
+
+  # Order pathways by significance
+  df <- df[order(df$p.adjusted), ]
+  df$pathway <- factor(df$pathway, levels = df$pathway)
+
+  xvals <- -log10(df$p.adjusted)
+
+  plot_ly() %>%
+
+    # Lollipop sticks
+    add_segments(
+      x = 0,
+      xend = xvals,
+      y = df$pathway,
+      yend = df$pathway,
+      line = list(
+        color = "grey60",
+        width = scales::rescale(df$OR, to = c(1, 6))
+      ),
+      hoverinfo = "none"
+    ) %>%
+
+    # Lollipop heads
+    add_markers(
+      x = xvals,
+      y = df$pathway,
+      marker = list(
+        size = scales::rescale(df$p.value, to = c(6, 18)),
+        color = df$OR,
+        colorscale = "Viridis",
+        showscale = TRUE,
+        colorbar = list(title = "Odds ratio")
+      ),
+      text = paste0(
+        "Pathway: ", df$pathway, "<br>",
+        "p-value: ", signif(df$p.value, 3), "<br>",
+        "Adjusted p: ", signif(df$p.adjusted, 3), "<br>",
+        "Odds ratio: ", signif(df$OR, 3)
+      ),
+      hoverinfo = "text"
+    ) %>%
+
+    layout(
+      title = "ORA Lollipop Plot",
+      xaxis = list(title = "-log10(adjusted p-value)"),
+      yaxis = list(title = "Pathway"),
+      margin = list(l = 200),
+      legend = list(orientation = "v")
+    )
+})
+
+
+
+
+   reactive_pathway <- reactive({
+     attr(reactive_featureData(), "GS")
+   })
+   rii <- reactiveVal()
+   observe({
+     req(reactive_i())
+     if (length(reactive_i()) <= 1) 
+       return(NULL)
+     if (length(reactive_i()) <= 3) 
+       rii("notest")
+     else rii(reactive_i())
+   })
+   oraTab <- reactive({
+     req(rii())
+     notest <- "No geneset has been tested, please try to include more input feature IDs!"
+     if (rii()[1] == "notest") 
+       return(notest)
+     tab <- vectORATall(reactive_pathway(), i = rii(), background = nrow(reactive_featureData()))
+     if (is.null(tab)) 
+       return(notest)
+     ic <- which(vapply(tab, function(x) is.numeric(x) & !is.integer(x), 
+                        logical(1)))
+     tab[, ic] <- lapply(tab[, ic], signif, digits = 3)
+     tab <- tab[which(tab$p.adjusted < 0.1 | tab$p.value < 
+                        0.05 | tab$OR >= 3), ]
+     tab
+   })
+   output$errorMsg <- renderText({
+     req(is.character(oraTab()))
+     oraTab()
+   })
+   output$error <- renderUI(verbatimTextOutput(ns("errorMsg")))
+   vi <- callModule(dataTableDownload_module, id = "stab", reactive_table = reactive({
+     req(is.data.frame(oraTab()))
+     print(oraTab())
+     oraTab()
+   }), reactive_cols = reactive(setdiff(colnames(oraTab()), 
+                                        "overlap_ids")), prefix = "ORA_", sortBy = "p.value", 
+   decreasing = FALSE)
+   hd <- reactive({
+     req(is.data.frame(oraTab()))
+     req(i <- vi())
+     ii <- grep("^General", colnames(reactive_featureData()), 
+                ignore.case = TRUE)
+     if (length(ii) == 0) 
+       ii <- seq_len(min(3, ncol(reactive_featureData())))
+     i <- oraTab()[i, ]
+     hid <- i$overlap_ids[[1]]
+     req(hid)
+     df1 <- reactive_featureData()[hid, ii, drop = FALSE]
+     df1 <- cbind(Overlap = "+", df1)
+     apath <- reactive_pathway()[reactive_pathway()$gsId == 
+                                   i$pathway, ]
+     aid <- setdiff(apath$featureId, hid)
+     if (length(aid) > 0) {
+       df2 <- reactive_featureData()[aid, ii, drop = FALSE]
+       df2 <- cbind(Overlap = "", df2)
+       df1 <- rbind(df1, df2)
+     }
+    
+     df1
+   })
+   print('this is the ORA data')
+  
+   vi2 <- callModule(dataTableDownload_module, id = "overlapTab", 
+                     reactive_table = hd, prefix = "ORA_overlapGenes_")
+ }
+
+
+
+
+
+
+enrichment_analysis_ui <- function(id) {
   ns <- NS(id)
-  tagList(uiOutput(ns("error")), dataTableDownload_ui(ns("stab")), 
-          dataTableDownload_ui(ns("overlapTab")))
+
+  tagList(
+    uiOutput(ns("error")),
+    plotlyOutput(ns("loli_plot"), height = "500px"),
+    dataTableDownload_ui(ns("stab")),
+    dataTableDownload_ui(ns("overlapTab"))
+  )
 }
 
 
