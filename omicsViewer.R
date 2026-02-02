@@ -14,11 +14,15 @@ get_intensity_type <- function(config_file){
 
 
 clean_column_names <- function(df){
+
+  try({
       # removing the prefix General.All from all column names
       colnames(df) <- gsub(x=colnames(df),pattern = 'General.All.',replacement = '')
       colnames(df) <- gsub(x=colnames(df),pattern = 'General.', replacement = '')
       colnames(df) <- gsub(x=colnames(df),pattern = '.All.', replacement = '')
-      return(df)
+
+})
+        return(df)
 }
 
 re_order_ttest_columns <- function(df,
