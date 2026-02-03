@@ -1378,77 +1378,72 @@ module_normalization <- function (id, object, config)
                 
             df$ID = rownames(df)
             df = df[,c('ID',colnames(df)[colnames(df) %in% phenodata$Label])]
-            df_long <- pivot_longer(
-            df,
-            cols = -ID,
-            names_to = "variable",
-            values_to = "intensity"
-            )
 
+            make_cv_df <- function(df,phenodata,pheno){
+            print(pheno)
+            if (pheno == 'global') {
+            meta_df = phenodata
+            }else{
+            meta_df = phenodata[phenodata$cv_group %in% pheno,]
+            }
+            df = df[,c('ID',colnames(df)[colnames(df) %in% meta_df$Label])]
+            df_long <- pivot_longer(df,  cols = -ID,  names_to = "variable",  values_to = "intensity")
             df_long <- df_long[!is.na(df_long$intensity), ]
-            df_long = merge(df_long,phenodata,by.x='variable',by.y = 'Label')
-            #df_long$cv_group = paste(df_long$Var3,df_long$Var4,sep = '_')
-            #df_long$cv_group = df_long$replicate
-            df_long <- df_long %>%
-            group_by(ID, cv_group) %>%
-            mutate(count = sum(!is.na(intensity))) %>%
-            ungroup()
-
+            df_long = merge(df_long,meta_df,by.x='variable',by.y = 'Label')
+            df_long <- df_long %>%  group_by(ID, cv_group) %>%  mutate(count = sum(!is.na(intensity))) %>%  ungroup()
             df_long = as.data.frame(df_long)
             df_long = df_long[df_long['count'] >= 2,]
-            df_long <- df_long %>%
-            mutate(intensity = 10 ^ as.numeric(intensity))
-
-            cv_df <- df_long %>%
-            group_by(ID, cv_group) %>%
-            summarise(
-                std  = sd(intensity, na.rm = TRUE),
-                mean = mean(intensity, na.rm = TRUE),
-                .groups = "drop"
-            )
-
-
+            df_long <- df_long %>%  mutate(intensity = 10 ^ as.numeric(intensity))
+            cv_df <- df_long %>%  group_by(ID, cv_group) %>%  summarise(std  = sd(intensity, na.rm = TRUE), mean = mean(intensity, na.rm = TRUE),.groups = "drop" )
             cv_df$cv = cv_df$std / cv_df$mean
-            plot_cv <- function(df, legend) {
-            # Check column
-            if (!"cv" %in% colnames(df)) {
-                stop("cv should be in the columns")
+            if (!pheno == 'global') {
+            cv_df$pheno = pheno
+            }else{
+            cv_df$pheno = 'global'
             }
-            
-            # Remove NA
-            cv <- df$cv
-            cv <- cv[!is.na(cv)] * 100
-            
-            # ECDF (this is the key)
-            ec <- ecdf(cv)
-            
-            # X grid similar to np.linspace(0, 100, 1000)
-            x <- seq(0, 100, length.out = 1000)
-            
-            # Plot
-            plot(
-                x, ec(x),
-                type = "l",
-                xlim = c(0, 100),
-                ylim = c(0, 1),
-                xlab = "% CV",
-                ylab = "Cumulative frequency"
-            )
-            
-            legend(
-                "bottomright",
-                legend = legend,
-                lty = 1,
-                bty = "n"
-            )
+            cv_df
             }
 
 
-            plot_cv(cv_df,'CV plot')
+
+            plot_cv <- function(cv_df, phenodata, legend_title = "Pheno") {
+            # Create CV dataframe (your existing function)
+
+            # Remove NA and convert CV to percent
+            cv_df <- cv_df[!is.na(cv_df$cv), ]
+            cv_df$cv_percent <- cv_df$cv * 100
+            
+            # Check if 'pheno' column exists
+            if(!"pheno" %in% colnames(cv_df)) {
+                stop("cv_df must contain a 'pheno' column for grouping")
+            }
+            
+            # ggplot cumulative plot grouped by pheno
+            p <- ggplot(cv_df, aes(x = cv_percent, color = pheno)) +
+                stat_ecdf(geom = "step", size = 1) +  # step line
+                xlim(0, 100) +
+                ylim(0, 1) +
+                labs(
+                x = "% CV",
+                y = "Cumulative frequency",
+                color = legend_title
+                ) +
+                theme_minimal() +
+                theme(
+                legend.position = "bottom",
+                legend.title = element_text(size = 12),
+                legend.text = element_text(size = 10)
+                )
+            p
+            }
+
+            all_cv_df = lapply(unique(phenodata$cv_group),function(x)make_cv_df(df,phenodata,x))
+            final_df = do.call('rbind',all_cv_df)
+            global_df = make_cv_df(df,phenodata,'global')
+            all_df = rbind(final_df,global_df)
+            plot_cv(all_df,phenodata)
 
             }) # closing try statement
-
-
             }  # closing if statement for the column checking            
 
 
