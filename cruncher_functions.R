@@ -1295,6 +1295,8 @@ module_normalization <- function (id, object, config)
             featureTab_exclude(fDataKeep()[which(!i), ])
         })
         observe({
+
+
             pdata()
             updateSelectInput(session, inputId = "selectPheno",
                 choices = c("None", colnames(pdata())))
@@ -1317,6 +1319,7 @@ module_normalization <- function (id, object, config)
                 choices = cc, selected = conf()$normRow)
         })
         expr <- reactiveVal()
+
         featureData <- reactiveVal()
         observeEvent(input$test, {
             v <- NULL
@@ -1356,9 +1359,114 @@ module_normalization <- function (id, object, config)
             writeTriplet(expr = expr(), pd = pdata(), fd = eset()$fdata,
                 file = file, creator = "BayBioMS")
         })
+
+
+        
+
+        output$cvscatterplot <- renderPlot({
+            req(expr())
+            req(pdata())
+
+            df = as.data.frame(expr())
+            phenodata = as.data.frame(pdata())
+
+
+
+            if ('cv_group' %in% colnames(phenodata)){
+
+            try({
+                
+            df$ID = rownames(df)
+            df = df[,c('ID',colnames(df)[colnames(df) %in% phenodata$Label])]
+            df_long <- pivot_longer(
+            df,
+            cols = -ID,
+            names_to = "variable",
+            values_to = "intensity"
+            )
+
+            df_long <- df_long[!is.na(df_long$intensity), ]
+            df_long = merge(df_long,phenodata,by.x='variable',by.y = 'Label')
+            #df_long$cv_group = paste(df_long$Var3,df_long$Var4,sep = '_')
+            #df_long$cv_group = df_long$replicate
+            df_long <- df_long %>%
+            group_by(ID, cv_group) %>%
+            mutate(count = sum(!is.na(intensity))) %>%
+            ungroup()
+
+            df_long = as.data.frame(df_long)
+            df_long = df_long[df_long['count'] >= 2,]
+            df_long <- df_long %>%
+            mutate(intensity = 10 ^ as.numeric(intensity))
+
+            cv_df <- df_long %>%
+            group_by(ID, cv_group) %>%
+            summarise(
+                std  = sd(intensity, na.rm = TRUE),
+                mean = mean(intensity, na.rm = TRUE),
+                .groups = "drop"
+            )
+
+
+            cv_df$cv = cv_df$std / cv_df$mean
+            plot_cv <- function(df, legend) {
+            # Check column
+            if (!"cv" %in% colnames(df)) {
+                stop("cv should be in the columns")
+            }
+            
+            # Remove NA
+            cv <- df$cv
+            cv <- cv[!is.na(cv)] * 100
+            
+            # ECDF (this is the key)
+            ec <- ecdf(cv)
+            
+            # X grid similar to np.linspace(0, 100, 1000)
+            x <- seq(0, 100, length.out = 1000)
+            
+            # Plot
+            plot(
+                x, ec(x),
+                type = "l",
+                xlim = c(0, 100),
+                ylim = c(0, 1),
+                xlab = "% CV",
+                ylab = "Cumulative frequency"
+            )
+            
+            legend(
+                "bottomright",
+                legend = legend,
+                lty = 1,
+                bty = "n"
+            )
+            }
+
+
+            plot_cv(cv_df,'CV plot')
+
+            }) # closing try statement
+
+
+            }  # closing if statement for the column checking            
+
+
+            })
+
+
+
+
+
+
+
         stats <- reactive({
             req(expr())
             req(input$imputationMethod)
+
+            print('this is a test of expr')
+
+
             imputationMethod = input$imputationMethod
 
             show_modal_spinner(text = "Calculating ...")
@@ -1367,51 +1475,78 @@ module_normalization <- function (id, object, config)
             remove_modal_spinner()
             r
         })
+
         output$barplot <- renderPlotly({
+
             cutnumorchar <- function(x, n = 60, alt = "") {
+
                 if (is.character(x) || is.factor(x)) {
                   message("too many distinct values, not suitable for color mapping!")
                   v <- alt
                 }
+
                 else if (is.numeric(x)) {
                   v <- as.character(cut(x, breaks = n, include.lowest = TRUE,
                     dig.lab = 3))
                 }
+
                 else stop("cutnumorchar: x needs to be one of objects: numeric, character, factor")
                 v
             }
+
+
             req(nrow(pdata()) == length(stats()$nval))
             req(input$selectPheno)
-            data <- data.frame(x = names(stats()$nval), y = stats()$nval,
+
+            data <- data.frame(
+                x = names(stats()$nval),
+                y = stats()$nval,
                 dec = stats()$nvalInt, inc = stats()$nvalCum,
-                col = "# ID", stringsAsFactors = FALSE)
+                col = "# ID", stringsAsFactors = FALSE
+                )
+
             data$x <- factor(data$x, levels = unique(data$x))
             cc <- "gray"
+
             if (input$selectPheno %in% colnames(pdata())) {
                 data$col <- pdata()[, input$selectPheno]
                 cc <- nColors(k = length(unique(data$col)))
                 if (length(unique(data$col)) > 60)
                   data$col <- cutnumorchar(data$col, alt = "# ID")
             }
+
             if (is.numeric(data$col))
                 data$col <- as.character(data$col)
+
             fig <- plot_ly(data)
+
             fig <- add_trace(fig, x = ~x, y = ~y, type = "bar",
                 color = ~col, colors = cc)
+
             if (!is.null(data$dec))
                 fig <- add_trace(fig, x = ~x, y = ~dec, type = "scatter",
                   mode = "lines+markers", name = "Shared")
+
             if (!is.null(data$inc))
                 fig <- add_trace(fig, x = ~x, y = ~inc, type = "scatter",
                   mode = "lines+markers", name = "Cummu.")
+
             if (input$hideLegend) {
-                 layout(fig, xaxis = list(title = ""), yaxis = list(title = "ID"),
+
+                 layout(
+                  fig,
+                  xaxis = list(title = ""),
+                  yaxis = list(title = "ID"),
                 showlegend = FALSE
+
                   )
             }
             else {
-                layout(fig, xaxis = list(title = ""), yaxis = list(title = "ID"),
-                legend = list(orientation = "h", x = 0, y = 1.01,yanchor = "bottom")
+                layout(
+                    fig,
+                    xaxis = list(title = ""),
+                    yaxis = list(title = "ID"),
+                    legend = list(orientation = "h", x = 0, y = 1.01,yanchor = "bottom")
                   )
             }
 
@@ -1559,8 +1694,11 @@ module_normalization_ui <- function (id, viewOnly = FALSE)
             inputId = ns("hideLegend"),
             label   = "Hide legend in plots",
             value   = FALSE
+            ), plotly_boxplot_ui(ns("boxplotly"))),
+            column(
+                width = 6,
+                plotOutput(ns("cvscatterplot"), height = "400px")
             ),
-            plotly_boxplot_ui(ns("boxplotly"))),
             column(width = 6, tags$b("Protein ID"), 
             plotlyOutput(ns("barplot"))))))))
 }
