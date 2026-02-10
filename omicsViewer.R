@@ -1,16 +1,19 @@
 source('libs.R')
 source('all_colors.R')
 
+
 get_intensity_type <- function(config_file){
   config <- read_yaml(config_file)
-  if(config$normalization$inputData == "LFQ.intensity"){
-    return('LFQ')
-    
-  }else{
+  if(config$normalization$inputData == "iBAQ"){
     return('iBAQ')
+  
+  }else{
+    
+    return('LFQ')
   }
   
 }
+
 
 
 clean_column_names <- function(df){
