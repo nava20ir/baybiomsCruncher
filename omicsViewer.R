@@ -2,6 +2,15 @@ source('libs.R')
 source('all_colors.R')
 
 
+
+categorize_pathway <- function(x) {
+  ifelse(grepl("CC_", x, ignore.case = TRUE), "CC",
+  ifelse(grepl("BP_", x, ignore.case = TRUE), "BP",
+  ifelse(grepl("MF_", x, ignore.case = TRUE), "MF",
+         "Other")))
+}
+
+
 get_intensity_type <- function(config_file){
   config <- read_yaml(config_file)
   if(config$normalization$inputData == "iBAQ"){
@@ -347,7 +356,6 @@ app_module <- function (input, output, session, .dir, filePattern = ".(RDS|db|sq
       return(list(FALSE, "The rownames/colnames of exprs not matched to row names of feature data/phenotype data!"))
     TRUE
   }
-  print('middle of app module')
   vEset <- reactiveVal(FALSE)
   observe({
     req(expr())
@@ -1381,14 +1389,13 @@ drawButton <- function (id)
 
 output$loli_plot <- renderPlotly({
 
-  tab <- oraTab()
-  if (!is.data.frame(tab) || nrow(tab) == 0)
+  df <- oraTab()
+  if (!is.data.frame(df) || nrow(df) == 0)
     return(plotly_empty())
 
-  df <- tab
-
+  print(df$patway_category)
   # Order pathways by significance
-  df <- df[order(df$p.adjusted), ]
+  df <- df[order(df$p.adjusted,decreasing = TRUE), ]
   df$pathway <- factor(df$pathway, levels = df$pathway)
 
   xvals <- -log10(df$p.adjusted)
@@ -1413,7 +1420,7 @@ output$loli_plot <- renderPlotly({
       x = xvals,
       y = df$pathway,
       marker = list(
-        size = scales::rescale(df$p.value, to = c(6, 18)),
+        size = scales::rescale(df$OR, to = c(1, 18)),
         color = df$OR,
         colorscale = "Viridis",
         showscale = TRUE,
@@ -1465,6 +1472,10 @@ output$loli_plot <- renderPlotly({
      tab[, ic] <- lapply(tab[, ic], signif, digits = 3)
      tab <- tab[which(tab$p.adjusted < 0.1 | tab$p.value < 
                         0.05 | tab$OR >= 3), ]
+     tab$patway_category <- categorize_pathway(tab$pathway)
+     #print('this is the selected ontology')
+     print(input$ontology_select)
+     tab = tab[tab$patway_category == input$ontology_select, ]
      tab
    })
    output$errorMsg <- renderText({
@@ -1474,7 +1485,6 @@ output$loli_plot <- renderPlotly({
    output$error <- renderUI(verbatimTextOutput(ns("errorMsg")))
    vi <- callModule(dataTableDownload_module, id = "stab", reactive_table = reactive({
      req(is.data.frame(oraTab()))
-     print(oraTab())
      oraTab()
    }), reactive_cols = reactive(setdiff(colnames(oraTab()), 
                                         "overlap_ids")), prefix = "ORA_", sortBy = "p.value", 
@@ -1519,6 +1529,12 @@ enrichment_analysis_ui <- function(id) {
   tagList(
     uiOutput(ns("error")),
     plotlyOutput(ns("loli_plot"), height = "500px"),
+    radioButtons(
+      ns("ontology_select"),
+      "Ontology:",
+      choices = c("MF", "CC", "BP",'Other'),
+      inline = TRUE
+    ),
     dataTableDownload_ui(ns("stab")),
     dataTableDownload_ui(ns("overlapTab"))
   )
@@ -1611,7 +1627,6 @@ enrichment_fgsea_ui <- function (id)
 
 exprsImpute <- function (x) 
 {
-  print('Running exprsImpute')
   v <- try(x@assayData$exprs_impute, silent = TRUE)
   if (inherits(v, "try-error")) 
     v <- NULL
@@ -1622,7 +1637,6 @@ exprsImpute <- function (x)
 exprspca <- function (x, n = min(8, ncol(x) - 1), prefix = "PCA|All", fillNA = FALSE, method = 'custom',
                       ...) 
 {
-  print('calling exprspca function from omicsViewer')
   writePC <- function(x, n) {
     n <- min(n, length(x$sdev))
     var <- round(x$sdev[seq_len(n)]^2/(sum(x$sdev^2)) * 100, 
@@ -1636,7 +1650,6 @@ exprspca <- function (x, n = min(8, ncol(x) - 1), prefix = "PCA|All", fillNA = F
     list(samples = xx, features = pp)
   }
   if (fillNA) {
-    print(paste0(' #### using the imputation method from exprspca line 1176 omicsViewer #### ',method))
     x <- fillNA(x, method = method)
     pc <- prcomp(t(x))
   }
@@ -1956,8 +1969,6 @@ fillNA <- function(x, method='perseus'){
   message("Error caught: ", e$message)
   result  # Return fallback value
 })
-  print(any(is.na(result)))
-  print(mean(result))
   return(result)
 } 
 
@@ -1965,7 +1976,6 @@ fillNA <- function(x, method='perseus'){
 impute_custom <- function (x, maxfill = quantile(x, probs = 0.15, na.rm = TRUE), 
                     fillingFun = function(x) min(x, na.rm = TRUE) - log10(2)) 
 {
-  print('impute_custom: Running imputation function for Chen method')
   xf <- apply(x, 1, function(xx) {
     x3 <- xx
     x3[is.na(x3)] <- min(maxfill, fillingFun(xx))
@@ -1979,7 +1989,6 @@ impute_custom <- function (x, maxfill = quantile(x, probs = 0.15, na.rm = TRUE),
 
 
 impute_perseus <- function(object, width=0.3, downshift=1.8, seed=100) {
-  print('impute_perseus: Running imputation function for perseus method')
   mx <- max(object, na.rm=TRUE)
   mn <- min(object, na.rm=TRUE)
   set.seed(seed)
@@ -2187,7 +2196,6 @@ getExprs <- function (x)
 
 getExprsImpute <- function (x) 
 {
-  print('Running getExprsImpute')
   if (inherits(x, "SQLiteConnection")) {
     if (!"exprsimpute" %in% dbListTables(x)) 
       return(NULL)
@@ -2531,7 +2539,6 @@ iheatmapLegend <- function (id)
 iheatmapModule <- function (input, output, session, mat, pd, fd, status = reactive(NULL), 
                             fill.NA = TRUE , method = 'perseus') 
 {
-  print('Running iheatmapModule')
   ns <- session$ns
   matr <- reactive({
     req(mat())
@@ -3840,7 +3847,6 @@ motifRF <- function (fg.seqs, bg.seqs, fg.pfm = NULL, bg.pfm = NULL)
 
 multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'perseus', ...) 
 {
-  print(paste0(' #### using the imputation method from multi.t.test #### ',method))
   x0 <- x
 
   if (is.vector(compare) || length(compare) == 3) 
@@ -3870,7 +3876,6 @@ multi.t.test <- function (x, pheno, compare = NULL, fillNA = FALSE, method = 'pe
   }
 
 
-  print('going for t-test')
   for (i in seq_len(nrow(compare))) {
     v <- compare[i, ]
     i1 <- which(pheno[[v[1]]] == v[2])
@@ -4581,11 +4586,7 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
                              pca.fillNA = TRUE, method = 'custom', t.test = NULL, ttest.fillNA = FALSE, ..., 
                              gs = NULL, stringDB = NULL, surv = NULL, SummarizedExperiment = TRUE) 
 {
-  print('Running Preomics')
   if (method == 'none') ttest.fillNA = F # if method is none we turn off imputation for the t-test
-  print('####')
-  print(paste0('this is the ttest.fillNA: ',ttest.fillNA))
-  print('####')
   p0 <- pData
   de <- dim(expr)
   if (nrow(pData) != de[2]) 
@@ -4701,7 +4702,6 @@ prepOmicsViewer <- function (expr, pData, fData, PCA = TRUE, ncomp = min(8, ncol
 
   exprsWithAttr <- function(x, fillNA = FALSE, environment = FALSE, 
                             attrs = c("rowDendrogram", "colDendrogram")) {
-    print(paste0(' #### using the imputation method from exprsWithAttr #### ',method))
     if (environment) 
       aenv <- new.env()
     else aenv <- list()
@@ -5050,7 +5050,6 @@ readESVObj  <- function (x)
 removeVarQC <- function (x, ref, positive = TRUE, ...) 
 {
   tryCatch({
-  print('Running remove VarQC from omicsViewer')
   ls <- list(...)
   if (length(ls) > 0) 
     x <- normalize.nQuantiles(x, ...)
@@ -5065,7 +5064,6 @@ removeVarQC <- function (x, ref, positive = TRUE, ...)
   return(mm) 
 
   }, warning = function(w) {
-  print(paste0(w,'happened in svd'))
   return(x)
   }
 )
