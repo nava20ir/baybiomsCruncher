@@ -1,4 +1,3 @@
-# the way chen did it is that MQCruncher is sitting on the top of omicsViewer. package I first deconvoluted omicsViewer as explained in wiki
 source('omicsViewer.R')
 source('run_DIA_gui.R') # to calculte maxLFQ using iq and iBAQ with DIA-GUI package
 source('map2expr.R') # for mapping raw files to experiment names
