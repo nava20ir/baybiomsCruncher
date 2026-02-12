@@ -42,10 +42,10 @@ deploy:
     - echo "Deploying to $SSH_DEPLOY_HOST..."
     - COMPOSE_PATH=/home/asakhteman/$CI_PROJECT_NAME/$CI_COMMIT_REF_SLUG/
     - ssh asakhteman@$SSH_DEPLOY_HOST "mkdir -p $COMPOSE_PATH"
-    - scp  Dockerfile lims.yaml deploy_as_container.sh asakhteman@$SSH_DEPLOY_HOST:$COMPOSE_PATH
+    - scp  Dockerfile lims.yaml deploy_as_container.sh deployer@$SSH_DEPLOY_HOST:$COMPOSE_PATH
 
     # Deploy the prebuilt image
-    - ssh asakhteman@$SSH_DEPLOY_HOST "
+    - ssh deployer@$SSH_DEPLOY_HOST "
         cd $COMPOSE_PATH &&
         echo '$CI_REGISTRY_PASSWORD' | docker login -u '$CI_REGISTRY_USER' --password-stdin '$CI_REGISTRY' &&
         docker pull "$CI_REGISTRY_IMAGE:latest" &&
