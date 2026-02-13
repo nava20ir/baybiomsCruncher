@@ -1,8 +1,4 @@
 project_dir:
-  BayBioMS: 
-  BayBioMS_MRI: 
-  Kusterlab: 
-  Biotyping: 
-  Bioinformatics: 
-annot_dir: 
-hashtab_dir: 
+  MyProjects: /home/shiny/my_projects  
+annot_dir: /home/shiny/annotations
+hashtab_dir: /home/shiny/table

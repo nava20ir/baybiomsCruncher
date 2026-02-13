@@ -1,0 +1,54 @@
+ttest:
+  ttests:
+    '1':
+      Phenotype: Var3
+      Group.1: DCemR
+      Group.2: WT
+dataLoading:
+  path: /home/shiny/my_projects/project_example/cruncher_test
+  pathESVProject: /home/shiny/my_projects/project_example/cruncher_test/ESVProject
+  fdataHeader:
+  - Protein.IDs
+  - Majority.protein.IDs
+  fastaPath: /media/usersfiles/MQ/P373_01/P373_Campylobacter_11168_FASTA_protein.fasta
+cortest: []
+steps: []
+misc:
+  stringDBCol: Majority.protein.IDs
+  outlierAnalysis: no
+  ptmSeqMotif: ~
+normalization:
+  inputData: LFQ.intensity
+  imputationMethod: none
+  normCol: None
+  normRow: None
+gsAnnot:
+  gsAnnotFile: /home/shiny/annotations/P373_Campylobacter_11168_FASTA_protein_corrected.annot
+  gsAnnotCol: Majority.protein.IDs
+  gsAnnotColIsoSep: none
+  gsAnnotDbCol: ACC
+  gsAnnotDir: /home/shiny/annotations
+  gsAnnotUPDomain: Eukaryota
+  gsAnnotSource:
+  - BP_ARGOT
+  - CC_ARGOT
+  - CDD
+  - Coils
+  - DE
+  - EC_ARGOT
+  - FunFam
+  - Gene3D
+  - Hamap
+  - KEGG_ARGOT
+  - MF_ARGOT
+  - MobiDBLite
+  - NCBIfam
+  - PANTHER
+  - Pfam
+  - PIRSF
+  - PRINTS
+  - ProSitePatterns
+  - ProSiteProfiles
+  - SFLD
+  - SMART
+  - SUPERFAMILY
