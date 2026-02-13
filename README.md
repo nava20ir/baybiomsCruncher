@@ -1,11 +1,21 @@
-# mqCrunchAdmin
+# BayBioMS Cruncher
 
-
+# you can easily built and deploy the app on a linux station
 ## to build the image run 
 ```
 sudo docker build --no-cache . -t mqcruncher
+```
+# To RUN the app
+```
 sudo docker run -d -it --restart unless-stopped -v  $PWD/example/:/home/shiny/my_projects -v $PWD/example/table/:/home/shiny/table -v $PWD/example/annotations/:/home/shiny/annotations  -p 3839:3839 mqcruncher
 ```
+Now you can open the app on your browser
+
+```
+localhost:3839
+```
+
+Please open the mqpar file on the example folder for test. This is a test MaxQuant search
 
 
 "SummarizedExperiment" and the historical "ExpressionSet" are S4 objects storing high throughput omics data. The core component of the objects is an expression matrix, where the rows are features, such as genes, proteins, and columns are samples. The values in the matrix represent the abundance or presence/absence of features. The meta-information about features (rows) and samples (columns) are stored in *data.frames*-like object called "feature data" (or "row data") and "phenotype data" (or "col data), respectively. More detailed instructions of _ExpressionSet_ and _SummarizeExperiment_ could be found [here](https://www.bioconductor.org/packages/release/bioc/vignettes/Biobase/inst/doc/ExpressionSetIntroduction.pdf) and [here](https://bioconductor.org/packages/release/bioc/vignettes/SummarizedExperiment/inst/doc/SummarizedExperiment.html).
