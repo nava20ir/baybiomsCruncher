@@ -2,6 +2,70 @@ source('libs.R')
 source('all_colors.R')
 
 
+
+
+
+butterfly_get_median <- function(long_expression_g1_upper){
+df_median <- long_expression_g1_upper %>%
+  group_by(proteins, meta) %>%
+  summarise(median_intensity = median(intensity), .groups = "drop")
+df_median
+}
+
+
+
+
+make_butterfly_inputs <- function(pheno,meta_df,param,selected,expr_df, max_percent = 0.8, min_percent = 0.3){
+  
+  pheno = pheno[, c(selected,"General|All|Label" )]
+  colnames(pheno) = c('meta','label')
+  colnames(pheno)[grep("^(General|All)", colnames(pheno))]
+  grps = strsplit(param,'\\|')[[1]][2]
+  grp1 =  strsplit(grps,'_')[[1]][1]
+  grp2 =  strsplit(grps,'_')[[1]][3]
+  expr_df = as.data.frame(expr_df)
+  expr_df$proteins = rownames(expr_df)
+  
+  
+  long_expression = tidyr::gather(
+    expr_df,
+    key = "label",        # new column for the old column names
+    value = "intensity",  # new column for values
+    -proteins  
+    
+  )
+  long_expression = na.omit(long_expression)
+  long_expression = merge(long_expression,pheno,by='label')
+  long_expression = long_expression[which(long_expression$meta %in% c(grp1,grp2)),]
+  long_expression <- long_expression %>%
+    add_count(proteins, meta, name = "count_intensity")
+  
+  long_expression_g1 = long_expression[long_expression$meta == grp1,]
+  long_expression_g2 = long_expression[long_expression$meta == grp2,]
+
+
+  long_expression_g1_upper = long_expression_g1[long_expression_g1$count_intensity >= max_percent,]
+  long_expression_g2_lower = long_expression_g2[long_expression_g2$count_intensity >= min_percent,]
+  to_exclude1 = unique(long_expression_g2_lower$proteins)
+  
+  long_expression_g2_upper = long_expression_g2[long_expression_g2$count_intensity >= max_percent,]
+  long_expression_g1_lower = long_expression_g1[long_expression_g1$count_intensity >= min_percent ,]
+  to_exclude2 = unique(long_expression_g1_lower$proteins)
+  
+  long_expression_g1_upper = long_expression_g1_upper[! long_expression_g1_upper$proteins %in% to_exclude1,]
+  long_expression_g2_upper = long_expression_g2_upper[! long_expression_g2_upper$proteins %in% to_exclude2,]
+  
+  
+  
+  df_median1 = butterfly_get_median(long_expression_g1_upper)
+  df_median2 = butterfly_get_median(long_expression_g2_upper)
+  return(list(df_median1=df_median1,df_median2=df_median2))
+}
+
+
+
+
+
 categorize_pathway <- function(x) {
   ifelse(grepl("CC_", x, ignore.case = TRUE), "CC",
   ifelse(grepl("BP_", x, ignore.case = TRUE), "BP",
@@ -899,25 +963,46 @@ attr4selector_module <- function (input, output, session, reactive_meta = reacti
       updateSelectInput(session, inputId = "scorner", selected = "None")
     }
   })
+
+
   searchValue <- reactiveVal()
+  searchPattern <- reactiveVal()
+
   observe({
     foo <- function() searchValue(input$searchon)
     debounce(foo, 1000)
   })
+
+  observe({
+    foo <- function() searchPattern(input$searchonpattern)
+    debounce(foo, 1000)
+  })
+
+
   observe({
     if (is.null(vv())) {
       updateSelectInput(session, "searchon", choices = NULL, 
                         selected = NULL)
       searchValue(NULL)
+      searchPattern(NULL)
       pre_search(NULL)
     }
   })
+
+
   observe({
     req(vv())
-    req(searchValue())
-    params$highlight <- which(vv() %in% searchValue())
-    isolate(params$highlightName <- searchOnCol()$variable)
+    if (input$searchoncheck) {                              # this option is for searching/ highlighting proteins by selecting their names from the selectize list; it is more suitable for searching a small number of proteins with known names
+    req(searchValue())                                      # searchValue() entails protein names from the selectize list
+    params$highlight <- which(vv() %in% searchValue())      # entails the indices of the highlighted proteins in the selectize list
+    } else {
+      req(searchPattern())                                  # searchPattern() entails the search pattern from the text input (e.g. "MAPK" to search for all proteins with "MAPK" in their names)
+      params$highlight <- grep(searchPattern(), vv())       # entails the indices of the highlighted proteins in the selectize list
+    }
+    isolate(params$highlightName <- searchOnCol()$variable) # entails the name of the column in the meta data that is used for searching/ highlighting (e.g. "Gene.names" or "Majority.protein.IDs" for proteomics data)
   })
+
+
   observe(params$color <- varSelector(selectColor(), reactive_expr(), 
                                       reactive_meta(), alternative = selectShape()$variable))
   observe(params$shape <- varSelector(selectShape(), reactive_expr(), 
@@ -1008,8 +1093,11 @@ attr4selector_ui <- function (id, circle = TRUE, right = FALSE)
           checkboxInput(ns("showSearchBox"), label = "show", 
           value = FALSE)), conditionalPanel("input.showSearchBox == true", 
           ns = ns, div(style = "padding-left:100px; padding-right:0px; padding-top:0px; padding-bottom:0px", 
-          selectInput(ns("searchon"), label = NULL, choices = NULL, 
-          multiple = TRUE, width = "100%"))), fluidRow(column(2), 
+          checkboxInput(ns("searchoncheck"), label = "Search by ids from the list", value = TRUE),
+          selectInput(ns("searchon"), label = NULL, choices = NULL, multiple = TRUE, width = "100%"),
+          textInput(ns("searchonpattern"), label = "Search Pattern", width = "100%")          
+          )), 
+          fluidRow(column(2), 
           column(4, offset = 0, style = "padding:2px;", textInputIcon(inputId = ns("xcut"), 
           label = "Select points by x/y cutoffs", value = "log10(2)", 
           placeholder = "e.g. -1 or -log10(2)", icon = list("x-cut"))), 
@@ -1863,14 +1951,20 @@ feature_general_module <- function (input, output, session, reactive_expr, react
     l
   })
   showRegLine <- reactiveVal(FALSE)
+
   htestV1 <- reactiveVal()
   htestV2 <- reactiveVal()
   v_scatter <- callModule(plotly_scatter_module, id = "feature_general_scatter", 
-                          reactive_param_plotly_scatter = scatter_vars, reactive_checkpoint = showScatter, 
-                          reactive_regLine = reactive(showRegLine()))
+                          reactive_param_plotly_scatter = scatter_vars,
+                          reactive_checkpoint = showScatter, 
+                          reactive_regLine = reactive(showRegLine())
+                          )
+
   observe({
     showRegLine(v_scatter()$regline)
   })
+
+
   v_beeswarm <- callModule(plotly_scatter_module, id = "feature_general_beeswarm", 
                            reactive_param_plotly_scatter = scatter_vars, reactive_checkpoint = showBeeswarm, 
                            htest_var1 = htestV1, htest_var2 = htestV2)
@@ -1910,10 +2004,13 @@ feature_general_module <- function (input, output, session, reactive_expr, react
   observeEvent(reactive_status(), {
     if (!is.null(s <- reactive_status())) 
       showRegLine(s$showRegLine)
+    
   })
   rv <- reactiveValues()
   observe(rv$xax <- v1())
   observe(rv$showRegLine <- showRegLine())
+  
+
   observe(rv$attr4 <- attr4select$status)
   observe({
     rv$htestV1 <- v_beeswarm()$htestV1
@@ -3716,15 +3813,21 @@ meta_scatter_module <- function (input, output, session, reactive_meta = reactiv
     l
   })
   showRegLine <- reactiveVal(FALSE)
+
   htestV1 <- reactiveVal()
   htestV2 <- reactiveVal()
   v_scatter <- callModule(plotly_scatter_module, id = "main_scatterOutput", reactive_expr = reactive_expr,reactive_meta = reactive_meta,
-                          reactive_param_plotly_scatter = scatter_vars, reactive_regLine = showRegLine, second_meta = second_meta,
+                          reactive_param_plotly_scatter = scatter_vars, 
+                          reactive_regLine = showRegLine,
+                          second_meta = second_meta,
                           htest_var1 = htestV1, htest_var2 = htestV2)
   observe({
     showRegLine(v_scatter()$regline)
   })
 
+  #observe({
+  #  showfixedLabel(v_scatter()$fixedLabel)
+  #})
 
   selVal <- reactiveVal(list(clicked = character(0), selected = character(0)))
   sbc <- reactiveVal(FALSE)
@@ -3772,7 +3875,11 @@ meta_scatter_module <- function (input, output, session, reactive_meta = reactiv
               r1["y0"] & cc$y < r1["y1"])
     })
     i <- sort(unique(unlist(i)))
-    selVal(list(clicked = character(0), selected = l[i]))
+    u_s <- l[i]
+    try({
+    u_s <- c(u_s,l[l %in% v_scatter()$butterfly_selected$key])
+   })
+    selVal(list(clicked = character(0), selected = u_s ))
     sbc(TRUE)
   })
   observe({
@@ -4314,9 +4421,11 @@ plotly_scatter <- function (x, y, xlab = "", ylab = "ylab", color = "", shape = 
                             size = 10, tooltips = NULL, regressionLine = FALSE, source = "scatterplotlysource", 
                             sizeRange = c(5, 15), highlight = NULL, highlightName = "Highlighted", 
                             inSelection = NA, vline = NULL, hline = NULL, rect = NULL, 
-                            drawButtonId = NULL) 
+                            drawButtonId = NULL, fixtooltip = FALSE) 
 {
   options(stringsAsFactors = FALSE)
+  print("plotly_scatter: start plotting ...this is showlabels")
+  print(fixtooltip)
   i1 <- (is.factor(x) || is.character(x) || is.logical(x)) && 
     is.numeric(y)
   i2 <- (is.factor(y) || is.character(y) || is.logical(y)) && 
@@ -4379,9 +4488,14 @@ plotly_scatter <- function (x, y, xlab = "", ylab = "ylab", color = "", shape = 
   df$color <- f0(color, i = df$index)
   df$shape <- f0(shape, i = df$index)
   df$size <- f0(size, i = df$index)
-  if (!is.null(tooltips)) 
-    tlp <- paste0("<b>", tooltips[df$index], "</b><br>", 
-                  tlp)
+  if (!is.null(tooltips)){ 
+    tlp <- paste0("<b>", tooltips[df$index], "</b><br>", tlp)
+    df$fixed_tlp <- tooltips[df$index]
+    }else{
+      df$fixed_tlp <- tlp
+    }
+
+
   df$tlp <- tlp
   df$shape[is.na(df$shape)] <- "_NA_"
   df$color[is.na(df$color)] <- "_NA_"
@@ -4418,11 +4532,21 @@ plotly_scatter <- function (x, y, xlab = "", ylab = "ylab", color = "", shape = 
                                          ticktext = unique(df$x.orig)))
   }
   else {
-    fig <- add_trace(fig, x = ~x, y = ~y, color = ~color, 
+
+    if (fixtooltip) {
+          fig <- add_trace(fig, x = ~x, y = ~y, color = ~color, 
                      colors = cc, symbol = ~shape, size = ~size, sizes = sizeRange, 
                      marker = list(sizemode = "diameter", opacity = mop), 
-                     text = ~tlp, hoverinfo = "text", type = "scatter", 
-                     mode = "markers")
+                     text = ~fixed_tlp, textposition = "top center", hoverinfo = "text", type = "scatter", 
+                     mode = "markers+text", showlegend = FALSE)
+    } else {
+          fig <- add_trace(fig, x = ~x, y = ~y, color = ~color, 
+                     colors = cc, symbol = ~shape, size = ~size, sizes = sizeRange, 
+                     marker = list(sizemode = "diameter", opacity = mop), 
+                     text = ~fixed_tlp, hoverinfo = "text", type = "scatter", 
+                     mode = "markers", showlegend = TRUE)
+    }
+
     if (regressionLine) {
       mod <- lm(df$y ~ df$x)
       prd <- predict(mod, newdata = data.frame(x), interval = "confidence")
@@ -4483,6 +4607,7 @@ plotly_scatter_module <- function (input,
                                    reactive_expr = NULL,
                                    reactive_meta = NULL,
                                    reactive_regLine = reactive(FALSE),
+                                   reactive_fixedLabel = reactive(FALSE),
                                    reactive_checkpoint = reactive(TRUE), 
                                    htest_var1 = reactive(NULL),
                                   htest_var2 = reactive(NULL)
@@ -4576,66 +4701,35 @@ output$butterfly_output <- renderPlotly({
     reactive_expr(),
     reactive_meta(),
     second_meta(),
-    input$butterfly_select   
+    input$butterfly_select,
+    input$butterfly_threshold_max,
+    input$butterfly_threshold_min,
+    plotter()   
   )
 
 tryCatch({
+
+
+id <- plotter()$data$index
+
 meta_df = reactive_meta()
 expr_df = reactive_expr()
+expr_df = expr_df[-id,] # removing the ids already displayed in the volcano plot
 param = reactive_param_plotly_scatter()$xlab
 pheno = second_meta()
 selected = input$butterfly_select
-pheno = pheno[, c(selected,"General|All|Label" )]
-colnames(pheno) = c('meta','label')
-colnames(pheno)[grep("^(General|All)", colnames(pheno))]
-grps = strsplit(param,'\\|')[[1]][2]
-grp1 =  strsplit(grps,'_')[[1]][1]
-grp2 =  strsplit(grps,'_')[[1]][3]
-expr_df = as.data.frame(expr_df)
-expr_df$proteins = rownames(expr_df)
-
-# expr_df$proteins = meta_df[,1]
-#if ("General|All|Protein.IDs" %in% colnames(meta_df))expr_df$proteins = meta_df$`General|All|Protein.IDs`
-#if ("General|All|Fasta.headers" %in% colnames(meta_df))expr_df$proteins = meta_df$`General|All|Fasta.headers`
-#if ("General|All|Modified.Sequence" %in% colnames(meta_df))expr_df$proteins = meta_df$`General|All|Modified.Sequence`
-long_expression = tidyr::gather(
-  expr_df,
-  key = "label",        # new column for the old column names
-  value = "intensity",  # new column for values
-  -proteins  
-  
-  )
-long_expression = na.omit(long_expression)
-long_expression = merge(long_expression,pheno,by='label')
-long_expression = long_expression[which(long_expression$meta %in% c(grp1,grp2)),]
-long_expression <- long_expression %>%
-  add_count(proteins, meta, name = "count_intensity")
-long_expression_g1 = long_expression[long_expression$meta == grp1,]
-long_expression_g2 = long_expression[long_expression$meta == grp2,]
-
-long_expression_g1_upper = long_expression_g1[long_expression_g1$count_intensity >= round(0.8* max(long_expression_g1$count_intensity)),]
-long_expression_g2_lower = long_expression_g2[long_expression_g2$count_intensity >= round(0.3* max(long_expression_g2$count_intensity)),]
-to_exclude1 = unique(long_expression_g2_lower$proteins)
-
-long_expression_g2_upper = long_expression_g2[long_expression_g2$count_intensity >= round(0.8* max(long_expression_g2$count_intensity)),]
-long_expression_g1_lower = long_expression_g1[long_expression_g1$count_intensity >= round(0.3* max(long_expression_g1$count_intensity)),]
-to_exclude2 =unique(long_expression_g1_lower$proteins)
-
-long_expression_g1_upper = long_expression_g1_upper[! long_expression_g1_upper$proteins %in% to_exclude1,]
-long_expression_g2_upper = long_expression_g2_upper[! long_expression_g2_upper$proteins %in% to_exclude2,]
-
-get_median <- function(long_expression_g1_upper){
-df_median <- long_expression_g1_upper %>%
-  group_by(proteins, meta) %>%
-  summarise(median_intensity = median(intensity), .groups = "drop")
-df_median
-}
-df_median1 = get_median(long_expression_g1_upper)
-df_median2 = get_median(long_expression_g2_upper)
+max_threshold = input$butterfly_threshold_max
+min_threshold = input$butterfly_threshold_min
+final_input_df <- make_butterfly_inputs(pheno,meta_df,param,selected,expr_df,max_percent=max_threshold,min_percent=min_threshold)
+df_median1 = final_input_df$df_median1
+df_median2 = final_input_df$df_median2
 
 
-# TODO : make a generic function for the butterfly plot and use it in the volcano plot as well.
-# Prepare ggplot
+status = 'both' # means butterfly with both sides
+if (!(inherits(df_median1, "data.frame") && nrow(df_median1) > 0)) status = 'left'
+if (!(inherits(df_median2, "data.frame") && nrow(df_median2) > 0)) status = 'right'
+
+if (status == 'both' || status == 'right' ){
 p1 <- df_median1 %>%
   arrange(median_intensity) %>%  
   mutate(proteins = factor(proteins, levels = proteins)) %>%
@@ -4657,8 +4751,11 @@ p1 <- df_median1 %>%
     panel.grid = element_blank(),
     plot.margin = margin(5,5,5,5)
   )
-
+# Convert to plotly
+p1_plotly <- ggplotly(p1,source = "butterfly_output",tooltip = "text")
+}
 # Right plot (remove y-axis labels/ticks)
+if (status == 'both' || status == 'left' ){
 p2 <- df_median2 %>%
   arrange(median_intensity) %>%  
   mutate(proteins = factor(proteins, levels = rev(proteins))) %>%
@@ -4679,23 +4776,56 @@ p2 <- df_median2 %>%
     panel.grid = element_blank(),
     plot.margin = margin(5,5,5,5)
   )
-# Convert to plotly
-p1_plotly <- ggplotly(p1,source = "butterfly_output",tooltip = "text")
+
 p2_plotly <- ggplotly(p2,source = "butterfly_output",tooltip = "text")
+}
+
+if (status == 'both'){
 # Arrange side by side with shared y-axis
-subplot(
+lastplot <- subplot(
   p2_plotly, p1_plotly,
   nrows = 1,       # side by side
   shareY = TRUE,   # share y-axis
   titleX = TRUE, titleY = TRUE
-) %>%
-  layout(dragmode = "select")
+)
+}
+
+if (status == 'both'){
+# Arrange side by side with shared y-axis
+lastplot <- subplot(
+  p2_plotly, p1_plotly,
+  nrows = 1,       # side by side
+  shareY = TRUE,   # share y-axis
+  titleX = TRUE, titleY = TRUE
+)
+}
+
+if (status == 'right'){
+# Arrange side by side with shared y-axis
+lastplot <-   p1_plotly
+}
+
+if (status == 'left'){
+# Arrange side by side with shared y-axis
+lastplot <- p2_plotly
+
+}
+
+
+lastplot %>%
+  layout(
+    yaxis = list(autorange = TRUE),
+    dragmode = "select")
   },
   error = function(e) {
+    print('error in the butterfly plot')
+    print(e)
   p1 <- ggplot(data.frame()) +
     theme_void() 
     ggplotly(p1)
  })
+
+
 })
 
 
@@ -4705,14 +4835,13 @@ subplot(
       req(input$group2)
       req(x <- choices()$x)
       req(f <- choices()$f)
-      r1 <- try(t.test(x[f == input$group1], x[f == input$group2]), 
-                silent = TRUE)
+      r1 <- try(t.test(x[f == input$group1], x[f == input$group2], var.equal=TRUE),silent = TRUE)
     
       req(inherits(r1, "htest"))
       r2 <- wilcox.test(x[choices()$f == input$group1], x[choices()$f == 
                                                             input$group2])
       df <- data.frame(Diff = signif(r1$estimate[1] - r1$estimate[2], 
-                                     digits = 3), `P t-test` = signif(r1$p.value, digits = 3), 
+                                     digits = 3), `P t-test_WithoutImputation` = signif(r1$p.value, digits = 3), 
                        `P MVU-test` = signif(r2$p.value, digits = 3), check.names = FALSE, 
                        row.names = NULL)
       DT::datatable(df, options = list(searching = FALSE, lengthChange = FALSE, 
@@ -4723,9 +4852,15 @@ subplot(
      req(reactive_checkpoint())
      req(hm()$scatter)
      checkboxInput(ns("showRegLine"), "Regression line", reactive_regLine())
+ 
    })
   
   
+   output$labelTickBox <- renderUI({
+    checkboxInput(ns("showfixedLabel"), "Fixed labels", value = FALSE)
+   })
+
+
    reactive_param_plotly_scatter_src <- reactive({
      x <- reactive_param_plotly_scatter()
      src <- ifelse(!is.null(x$source), x$source, "scatterplotly")
@@ -4738,11 +4873,15 @@ subplot(
     req(reactive_checkpoint())
     if (!hm()$scatter) {
       return(do.call(plotly_scatter, args = c(reactive_param_plotly_scatter_src(), 
-                                              regressionLine = FALSE)))
+                                              regressionLine = FALSE, fixtooltip = input$showfixedLabel)))
     }
+
     req(!is.null(input$showRegLine))
     do.call(plotly_scatter, args = c(reactive_param_plotly_scatter_src(), 
-                                     regressionLine = input$showRegLine))
+                                     regressionLine = input$showRegLine,
+                                     fixtooltip = input$showfixedLabel
+                                      )
+                                     )
   })
 
   output$plotly.scatter.output <- renderPlotly({
@@ -4788,6 +4927,15 @@ plotly_scatter_ui <- function(id, height = "400px", show_butterfly = FALSE) {
   tagList(
     uiOutput(ns("htest")),
     uiOutput(ns("regTickBox")),
+    uiOutput(ns("labelTickBox")),
+# if (showfixedLabel) {
+#         checkboxInput(
+#             ns("fixedLabel"),
+#             label = "Show fixed labels",
+#             value = FALSE
+#         )
+
+# },
 
     shinycssloaders::withSpinner(
       plotlyOutput(ns("plotly.scatter.output"), height = height),
@@ -4801,7 +4949,34 @@ if (show_butterfly) {
       plotlyOutput(ns("butterfly_output"), height = "400px"),
       type = 8, color = "green"
     ),
-    uiOutput(ns("butterfly_select_ui"))   # 👈 dynamic selectize
+    fluidRow(
+      column(
+        width = 4,
+        uiOutput(ns("butterfly_select_ui"))
+      ),
+      column(
+        width = 4,
+        numericInput(
+          inputId = ns("butterfly_threshold_max"),
+          label = "Least number of samples in group of interest:",
+          value = 2,
+          min = 0,
+          max = 1000,
+          step = 1
+        )
+      ),
+      column(
+        width = 4,
+        numericInput(
+          inputId = ns("butterfly_threshold_min"),
+          label = "max number allowed in the other group:",
+          value = 2,
+          min = 0,
+          max = 1000,
+          step = 1
+        )
+      )
+    )
   )
 }
   )
